@@ -237,7 +237,7 @@ const ModalForm = () => {
         return str.charAt(0).toUpperCase() + str.slice(1);
     };
 
-    const validateCode = (value, maxLength = 16, fieldName = '') => {
+    const validateCode = (value, maxLength = 30, fieldName = '') => {
         // Allow only alphabets, numbers, and hyphen
         const filtered = value.replace(/[^A-Za-z0-9-]/g, '');
         if (filtered !== value && fieldName) {
@@ -282,7 +282,7 @@ const ModalForm = () => {
         return `${prefix}-${String(count + 1).padStart(2, '0')}`;
     };
 
-    const validateAlpha = (value, maxLength = 100, fieldName = '') => {
+    const validateAlpha = (value, maxLength = 30, fieldName = '') => {
         // Allow only alphabets and spaces
         const filtered = value.replace(/[^A-Za-z\s]/g, '');
         if (filtered !== value && fieldName) {
@@ -315,7 +315,7 @@ const ModalForm = () => {
         return filtered;
     };
 
-    const validateAlphaNumeric = (value, maxLength = 200, fieldName = '') => {
+    const validateAlphaNumeric = (value, maxLength = 30, fieldName = '') => {
         // Allow only alphabets, numbers, spaces, and hyphens
         const filtered = value.replace(/[^A-Za-z0-9\s-]/g, '');
         if (filtered !== value && fieldName) {
@@ -324,7 +324,7 @@ const ModalForm = () => {
         return capitalize(filtered).slice(0, maxLength);
     };
 
-    const validateName = (value, maxLength = 100, fieldName = '') => {
+    const validateName = (value, maxLength = 30, fieldName = '') => {
         // Disallow numbers and special characters - allow ONLY letters and spaces
         let filtered = value.replace(/[^A-Za-z\s]/g, '');
 
@@ -374,7 +374,7 @@ const ModalForm = () => {
 
 
     const handleClusterNameChange = (val) => {
-        const newName = validateName(val, 100, 'geo_name');
+        const newName = validateName(val, 30, 'geo_name');
         setFormData(prev => ({ ...prev, name: newName }));
     };
 
@@ -990,17 +990,22 @@ const ModalForm = () => {
                         </div>
                         <div className="form-grid">
                             <div className="form-group">
-                                <label className="premium-label"><Edit size={14} /> Level Name</label>
+                                <label className="premium-label"><Edit size={14} /> Level Name <span style={{ color: '#ef4444' }}>*</span></label>
                                 <div className="premium-input-wrapper">
                                     <Edit className="premium-input-icon" size={18} />
-                                    <input type="text" className="premium-input" placeholder="Enter Level Name" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateAlphaNumeric(e.target.value) })} required />
+                                    <input type="text" className="premium-input" placeholder="Enter Level Name" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateAlphaNumeric(e.target.value, 30, 'level_name') })} required />
                                 </div>
+                                {validationErrors.level_name && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <X size={12} /> {validationErrors.level_name}
+                                    </div>
+                                )}
                             </div>
                             <div className="form-group">
                                 <label className="premium-label"><FileDigit size={14} /> Level Code (Manual)</label>
                                 <div className="premium-input-wrapper">
                                     <FileDigit className="premium-input-icon" size={18} />
-                                    <input type="text" className="premium-input" placeholder="Enter Level Code" value={formData.level_code || ''} onChange={(e) => setFormData({ ...formData, level_code: validateCode(e.target.value, 16, 'level_code') })} required />
+                                    <input type="text" className="premium-input" placeholder="Enter Level Code" value={formData.level_code || ''} onChange={(e) => setFormData({ ...formData, level_code: validateCode(e.target.value, 30, 'level_code') })} required />
                                 </div>
                                 {validationErrors.level_code && (
                                     <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -1050,7 +1055,7 @@ const ModalForm = () => {
                                 <label className="premium-label"><TrendingUp size={14} /> Level Number / Rank (Manual)</label>
                                 <div className="premium-input-wrapper">
                                     <TrendingUp className="premium-input-icon" size={18} />
-                                    <input type="number" step="0.01" className="premium-input" placeholder="Enter Rank (1.0, 2.1, etc.)" value={formData.rank || ''} onChange={(e) => setFormData({ ...formData, rank: validateRank(e.target.value, 'rank') || null })} required />
+                                    <input type="text" className="premium-input" placeholder="Enter Rank (1.0, 2.1, etc.)" value={formData.rank || ''} onChange={(e) => setFormData({ ...formData, rank: validateRank(e.target.value, 'rank') || null })} required />
                                 </div>
                                 {validationErrors.rank && (
                                     <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -1361,7 +1366,7 @@ const ModalForm = () => {
                                 <label className="premium-label"><Network size={14} /> Unique Identification Code (Manual)</label>
                                 <div className="premium-input-wrapper">
                                     <Network className="premium-input-icon" size={18} />
-                                    <input type="text" className="premium-input" placeholder="Enter Unique Code" value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 16, 'office_code') })} required />
+                                    <input type="text" className="premium-input" placeholder="Enter Unique Code" value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 30, 'office_code') })} required />
                                 </div>
                                 {validationErrors.office_code && (
                                     <div style={{ color: '#ef4444', fontSize: '0.7rem', marginTop: '4px', marginLeft: '3rem' }}>
@@ -1385,7 +1390,7 @@ const ModalForm = () => {
                                         className="premium-input"
                                         placeholder={`Enter ${currentLevel?.level_code === 'L2' ? 'Vertical' : currentLevel?.name?.toLowerCase().includes('facility') ? 'Facility' : 'Office'} Name`}
                                         value={formData.name || ''}
-                                        onChange={(e) => setFormData({ ...formData, name: validateAlphaNumeric(e.target.value, 100, 'office_name') })}
+                                        onChange={(e) => setFormData({ ...formData, name: validateAlphaNumeric(e.target.value, 30, 'office_name') })}
                                         required
                                     />
                                 </div>
@@ -1402,7 +1407,7 @@ const ModalForm = () => {
                                         <label className="premium-label"><Edit size={14} /> Registered Name {currentLevel?.level_code === 'L3' && <span style={{ color: '#ef4444' }}>*</span>}</label>
                                         <div className="premium-input-wrapper">
                                             <FileText className="premium-input-icon" size={18} />
-                                            <input type="text" className="premium-input" placeholder="Legal Registered Name" value={formData.registered_name || ''} onChange={(e) => setFormData({ ...formData, registered_name: validateAlphaNumeric(e.target.value, 100, 'registered_name') })} required={currentLevel?.level_code === 'L3'} />
+                                            <input type="text" className="premium-input" placeholder="Legal Registered Name" value={formData.registered_name || ''} onChange={(e) => setFormData({ ...formData, registered_name: validateAlphaNumeric(e.target.value, 30, 'registered_name') })} required={currentLevel?.level_code === 'L3'} />
                                         </div>
                                         {validationErrors.registered_name && (
                                             <div style={{ color: '#ef4444', fontSize: '0.7rem', marginTop: '4px', marginLeft: '3rem' }}>
@@ -1893,7 +1898,7 @@ const ModalForm = () => {
                                 <label className="premium-label"><Network size={14} /> Department Code (Manual)</label>
                                 <div className="premium-input-wrapper">
                                     <Network className="premium-input-icon" size={18} />
-                                    <input type="text" className="premium-input" placeholder="Enter Department Code" value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 16, 'dept_code') })} required />
+                                    <input type="text" className="premium-input" placeholder="Enter Department Code" value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 30, 'dept_code') })} required />
                                 </div>
                                 {validationErrors.dept_code && (
                                     <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -1905,7 +1910,7 @@ const ModalForm = () => {
                                 <label className="premium-label"><Edit size={14} /> Department Name</label>
                                 <div className="premium-input-wrapper">
                                     <Edit className="premium-input-icon" size={18} />
-                                    <input type="text" className="premium-input" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value, 100, 'dept_name') })} required />
+                                    <input type="text" className="premium-input" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value, 30, 'dept_name') })} required />
                                 </div>
                                 {validationErrors.dept_name && (
                                     <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -2034,7 +2039,7 @@ const ModalForm = () => {
                                 <label className="premium-label"><Network size={14} /> Section Code (Manual)</label>
                                 <div className="premium-input-wrapper">
                                     <Network className="premium-input-icon" size={18} />
-                                    <input type="text" className="premium-input" placeholder="Enter Section Code" value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 16, 'sec_code') })} required />
+                                    <input type="text" className="premium-input" placeholder="Enter Section Code" value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 30, 'sec_code') })} required />
                                 </div>
                                 {validationErrors.sec_code && (
                                     <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -2046,7 +2051,7 @@ const ModalForm = () => {
                                 <label className="premium-label"><Edit size={14} /> Section Name</label>
                                 <div className="premium-input-wrapper">
                                     <Edit className="premium-input-icon" size={18} />
-                                    <input type="text" className="premium-input" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value, 100, 'sec_name') })} required />
+                                    <input type="text" className="premium-input" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value, 30, 'sec_name') })} required />
                                 </div>
                                 {validationErrors.sec_name && (
                                     <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -2164,7 +2169,7 @@ const ModalForm = () => {
                                         className="premium-input"
                                         placeholder="e.g. Regional Health Center A"
                                         value={formData.name || ''}
-                                        onChange={(e) => setFormData({ ...formData, name: validateAlphaNumeric(e.target.value, 100, 'facility_name') })}
+                                        onChange={(e) => setFormData({ ...formData, name: validateAlphaNumeric(e.target.value, 30, 'facility_name') })}
                                         required
                                     />
                                 </div>
@@ -2341,7 +2346,7 @@ const ModalForm = () => {
                                 <label className="premium-label"><Network size={14} /> Family Code (Manual) <span style={{ color: '#ef4444' }}>*</span></label>
                                 <div className="premium-input-wrapper">
                                     <Network className="premium-input-icon" size={18} />
-                                    <input type="text" className="premium-input" placeholder="Enter Family Code" value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 16, 'fam_code') })} required />
+                                    <input type="text" className="premium-input" placeholder="Enter Family Code" value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 30, 'fam_code') })} required />
                                 </div>
                                 {validationErrors.fam_code && (
                                     <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -2359,7 +2364,7 @@ const ModalForm = () => {
                                         className="premium-input"
                                         placeholder="Enter Job Family Name"
                                         value={formData.name || ''}
-                                        onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value, 100, 'jf_name') })}
+                                        onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value, 30, 'jf_name') })}
                                         required
                                     />
                                 </div>
@@ -2418,7 +2423,7 @@ const ModalForm = () => {
                                 <label className="premium-label"><Network size={14} /> Role Type Code (Manual) <span style={{ color: '#ef4444' }}>*</span></label>
                                 <div className="premium-input-wrapper">
                                     <Network className="premium-input-icon" size={18} />
-                                    <input type="text" className="premium-input" placeholder="Enter Role Type Code" value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 16, 'rt_code') })} required />
+                                    <input type="text" className="premium-input" placeholder="Enter Role Type Code" value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 30, 'rt_code') })} required />
                                 </div>
                                 {validationErrors.rt_code && (
                                     <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -2430,7 +2435,7 @@ const ModalForm = () => {
                                 <label className="premium-label"><Edit size={14} /> Role Type Name <span style={{ color: '#ef4444' }}>*</span></label>
                                 <div className="premium-input-wrapper">
                                     <Edit className="premium-input-icon" size={18} />
-                                    <input type="text" className="premium-input" placeholder="Enter Role Type Name" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value, 100, 'rt_name') })} required />
+                                    <input type="text" className="premium-input" placeholder="Enter Role Type Name" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value, 30, 'rt_name') })} required />
                                 </div>
                                 {validationErrors.rt_name && (
                                     <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -2514,7 +2519,7 @@ const ModalForm = () => {
                                 <label className="premium-label"><Network size={14} /> Role Code (Manual) <span style={{ color: '#ef4444' }}>*</span></label>
                                 <div className="premium-input-wrapper">
                                     <Network className="premium-input-icon" size={18} />
-                                    <input type="text" className="premium-input" placeholder="Enter Role Code" value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 16, 'role_code') })} required />
+                                    <input type="text" className="premium-input" placeholder="Enter Role Code" value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 30, 'role_code') })} required />
                                 </div>
                                 {validationErrors.role_code && (
                                     <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -2526,7 +2531,7 @@ const ModalForm = () => {
                                 <label className="premium-label"><Edit size={14} /> Role Name <span style={{ color: '#ef4444' }}>*</span></label>
                                 <div className="premium-input-wrapper">
                                     <Edit className="premium-input-icon" size={18} />
-                                    <input type="text" className="premium-input" placeholder="Enter Role Name" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value, 100, 'role_name') })} required />
+                                    <input type="text" className="premium-input" placeholder="Enter Role Name" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value, 30, 'role_name') })} required />
                                 </div>
                                 {validationErrors.role_name && (
                                     <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -2631,7 +2636,7 @@ const ModalForm = () => {
                                 <label className="premium-label"><Network size={14} /> Job Code (Manual) <span style={{ color: '#ef4444' }}>*</span></label>
                                 <div className="premium-input-wrapper">
                                     <Network className="premium-input-icon" size={18} />
-                                    <input type="text" className="premium-input" placeholder="Enter Job Code" value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 16, 'job_code') })} required />
+                                    <input type="text" className="premium-input" placeholder="Enter Job Code" value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 30, 'job_code') })} required />
                                 </div>
                                 {validationErrors.job_code && (
                                     <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -2644,7 +2649,7 @@ const ModalForm = () => {
                                 <label className="premium-label"><Edit size={14} /> Job Name <span style={{ color: '#ef4444' }}>*</span></label>
                                 <div className="premium-input-wrapper">
                                     <Edit className="premium-input-icon" size={18} />
-                                    <input type="text" className="premium-input" placeholder="Enter Job Name" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value, 100, 'job_name') })} required />
+                                    <input type="text" className="premium-input" placeholder="Enter Job Name" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value, 30, 'job_name') })} required />
                                 </div>
                                 {validationErrors.job_name && (
                                     <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -2759,7 +2764,7 @@ const ModalForm = () => {
                                 <label className="premium-label"><Network size={14} /> Task Code (Manual) <span style={{ color: '#ef4444' }}>*</span></label>
                                 <div className="premium-input-wrapper">
                                     <Network className="premium-input-icon" size={18} />
-                                    <input type="text" className="premium-input" placeholder="Enter Task Code" value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 16, 'task_code') })} required />
+                                    <input type="text" className="premium-input" placeholder="Enter Task Code" value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 30, 'task_code') })} required />
                                 </div>
                                 {validationErrors.task_code && (
                                     <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -2787,7 +2792,7 @@ const ModalForm = () => {
                                 <label className="premium-label"><Edit size={14} /> Task Name <span style={{ color: '#ef4444' }}>*</span></label>
                                 <div className="premium-input-wrapper">
                                     <Edit className="premium-input-icon" size={18} />
-                                    <input type="text" className="premium-input" placeholder="Enter Task Name" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateAlphaNumeric(e.target.value, 100, 'task_name') })} required />
+                                    <input type="text" className="premium-input" placeholder="Enter Task Name" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateAlphaNumeric(e.target.value, 30, 'task_name') })} required />
                                 </div>
                                 {validationErrors.task_name && (
                                     <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -2923,7 +2928,7 @@ const ModalForm = () => {
                                         placeholder="Enter Employee Code"
                                         value={formData.employee_code || ''}
                                         onChange={(e) => {
-                                            const code = validateCode(e.target.value, 16, 'employee_code');
+                                            const code = validateCode(e.target.value, 30, 'employee_code');
                                             setFormData({ ...formData, employee_code: code });
 
                                             // Immediate duplicate check against pre-loaded list
@@ -2950,7 +2955,7 @@ const ModalForm = () => {
                                         className="premium-input"
                                         placeholder="Enter Full Legal Name"
                                         value={formData.name || ''}
-                                        onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value, 100, 'employee_name') })}
+                                        onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value, 30, 'employee_name') })}
                                         required
                                     />
                                 </div>
@@ -3385,7 +3390,7 @@ const ModalForm = () => {
                                 <label className="premium-label"><Network size={14} /> Project Code (Manual) <span style={{ color: '#ef4444' }}>*</span></label>
                                 <div className="premium-input-wrapper">
                                     <Network className="premium-input-icon" size={18} />
-                                    <input type="text" className="premium-input" placeholder="Enter Project Code" value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 16, 'proj_code') })} required />
+                                    <input type="text" className="premium-input" placeholder="Enter Project Code" value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 30, 'proj_code') })} required />
                                 </div>
                                 {validationErrors.proj_code && (
                                     <div style={{ color: '#ef4444', fontSize: '0.7rem', marginTop: '4px', marginLeft: '3rem' }}>
@@ -3397,7 +3402,7 @@ const ModalForm = () => {
                                 <label className="premium-label"><Edit size={14} /> Project Name <span style={{ color: '#ef4444' }}>*</span></label>
                                 <div className="premium-input-wrapper">
                                     <Edit className="premium-input-icon" size={18} />
-                                    <input type="text" className="premium-input" placeholder="Enter Project Name" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateAlphaNumeric(e.target.value, 200, 'proj_name') })} required />
+                                    <input type="text" className="premium-input" placeholder="Enter Project Name" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateAlphaNumeric(e.target.value, 30, 'proj_name') })} required />
                                 </div>
                                 {validationErrors.proj_name && (
                                     <div style={{ color: '#ef4444', fontSize: '0.7rem', marginTop: '4px', marginLeft: '3rem' }}>
@@ -3800,7 +3805,7 @@ const ModalForm = () => {
                                 <label className="premium-label"><Edit size={14} /> Position Title (Display Name)</label>
                                 <div className="premium-input-wrapper">
                                     <Edit className="premium-input-icon" size={18} />
-                                    <input type="text" className="premium-input" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value, 100, 'pos_name') })} placeholder="e.g. Senior Project Manager" required />
+                                    <input type="text" className="premium-input" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value, 30, 'pos_name') })} placeholder="e.g. Senior Project Manager" required />
                                 </div>
                                 {validationErrors.pos_name && (
                                     <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -3813,7 +3818,7 @@ const ModalForm = () => {
                                 <label className="premium-label"><Network size={14} /> Position Code</label>
                                 <div className="premium-input-wrapper">
                                     <Network className="premium-input-icon" size={18} />
-                                    <input type="text" className="premium-input" placeholder="e.g. SPM-104-AP" value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 16, 'pos_code') })} required />
+                                    <input type="text" className="premium-input" placeholder="e.g. SPM-104-AP" value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 30, 'pos_code') })} required />
                                 </div>
                                 {validationErrors.pos_code && (
                                     <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -5472,14 +5477,14 @@ const ModalForm = () => {
                                 <label className="premium-label"><Building size={14} /> Bank Name <span style={{ color: '#ef4444' }}>*</span></label>
                                 <div className="premium-input-wrapper">
                                     <Building className="premium-input-icon" size={18} />
-                                    <input type="text" className="premium-input" placeholder="e.g. HDFC Bank" value={formData.bank_name || ''} onChange={(e) => setFormData({ ...formData, bank_name: validateAlphaNumeric(e.target.value, 100, 'bank_name') })} required />
+                                    <input type="text" className="premium-input" placeholder="e.g. HDFC Bank" value={formData.bank_name || ''} onChange={(e) => setFormData({ ...formData, bank_name: validateAlphaNumeric(e.target.value, 30, 'bank_name') })} required />
                                 </div>
                             </div>
                             <div className="form-group">
                                 <label className="premium-label"><User size={14} /> Account Holder Name</label>
                                 <div className="premium-input-wrapper">
                                     <User className="premium-input-icon" size={18} />
-                                    <input type="text" className="premium-input" placeholder="Name as per Passbook" value={formData.account_holder_name || ''} onChange={(e) => setFormData({ ...formData, account_holder_name: validateAlpha(e.target.value, 100, 'acc_holder') })} />
+                                    <input type="text" className="premium-input" placeholder="Name as per Passbook" value={formData.account_holder_name || ''} onChange={(e) => setFormData({ ...formData, account_holder_name: validateAlpha(e.target.value, 30, 'acc_holder') })} />
                                 </div>
                             </div>
                             <div className="form-group full-width">
@@ -5676,14 +5681,14 @@ const ModalForm = () => {
                                 <label className="premium-label"><UserPlus size={14} /> Primary Nominee Name</label>
                                 <div className="premium-input-wrapper">
                                     <UserPlus className="premium-input-icon" size={18} />
-                                    <input type="text" className="premium-input" placeholder="Nominee full name" value={formData.nominee_name || ''} onChange={(e) => setFormData({ ...formData, nominee_name: validateAlpha(e.target.value, 100, 'nominee') })} />
+                                    <input type="text" className="premium-input" placeholder="Nominee full name" value={formData.nominee_name || ''} onChange={(e) => setFormData({ ...formData, nominee_name: validateAlpha(e.target.value, 30, 'nominee') })} />
                                 </div>
                             </div>
                             <div className="form-group full-width">
                                 <label className="premium-label"><Heart size={14} /> Nominee Relationship</label>
                                 <div className="premium-input-wrapper">
                                     <Heart className="premium-input-icon" size={18} />
-                                    <input type="text" className="premium-input" placeholder="e.g. Spouse, Father, Mother" value={formData.nominee_relationship || ''} onChange={(e) => setFormData({ ...formData, nominee_relationship: validateAlpha(e.target.value, 50, 'relation') })} />
+                                    <input type="text" className="premium-input" placeholder="e.g. Spouse, Father, Mother" value={formData.nominee_relationship || ''} onChange={(e) => setFormData({ ...formData, nominee_relationship: validateAlpha(e.target.value, 30, 'relation') })} />
                                 </div>
                             </div>
                         </div>
@@ -5761,7 +5766,7 @@ const ModalForm = () => {
                                 <label className="premium-label"><Phone size={14} /> Emergency Contact Name <span style={{ color: '#ef4444' }}>*</span></label>
                                 <div className="premium-input-wrapper">
                                     <User size={18} className="premium-input-icon" />
-                                    <input type="text" className="premium-input" placeholder="Full name of emergency contact" value={formData.emergency_contact_name || ''} onChange={(e) => setFormData({ ...formData, emergency_contact_name: validateAlpha(e.target.value, 100, 'emer_name') })} required />
+                                    <input type="text" className="premium-input" placeholder="Full name of emergency contact" value={formData.emergency_contact_name || ''} onChange={(e) => setFormData({ ...formData, emergency_contact_name: validateAlpha(e.target.value, 30, 'emer_name') })} required />
                                 </div>
                             </div>
                             <div className="form-group">
