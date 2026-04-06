@@ -160,6 +160,10 @@ const GeoMapPicker = ({ latitude, longitude, onLocationSelect, searchQuery }) =>
                         key={searchQuery} // Force re-render when query changes
                         data={geoJsonData}
                         style={{ color: '#2563eb', weight: 2, fillOpacity: 0.05 }}
+                        pointToLayer={(feature, latlng) => {
+                            // If we already have a manual marker position, don't render another one from GeoJSON search result
+                            return null; 
+                        }}
                     />
                 )}
 

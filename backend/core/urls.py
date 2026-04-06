@@ -10,7 +10,7 @@ from .views import (
     GeoContinentViewSet, GeoCountryViewSet, GeoStateViewSet, GeoDistrictViewSet,
     GeoMandalViewSet, GeoClusterViewSet, VisitingLocationViewSet, LandmarkViewSet,
     PositionLevelViewSet, UserViewSet, LoginAPIView, LogoutAPIView, ChangePasswordView, RequestResetOTPView, ResetPasswordWithOTPView, EmployeeTaskUrlPermissionViewSet, EmployeeDetailsAPIView, APIKeyViewSet, LoginHitViewSet, BlockedEmployeeViewSet, AccountBlockHistoryViewSet, EmployeeArchiveViewSet, PositionAssignmentViewSet, PositionActivityLogViewSet,
-    GeoBulkUploadView, GeoFullHierarchyView, AuditLogViewSet, PositionBulkUploadView, EmployeeBulkUploadView
+    GeoBulkUploadView, GeoFullHierarchyView, AuditLogViewSet
 )
 from .dashboard_views import DashboardStatsView
 
@@ -75,7 +75,5 @@ urlpatterns = [
     path('dashboard/stats/', DashboardStatsView.as_view(), name='dashboard-stats'),
     path('geo/bulk-upload/', GeoBulkUploadView.as_view(), name='geo-bulk-upload'),
     path('geo/full-hierarchy/', GeoFullHierarchyView.as_view(), name='geo-full-hierarchy'),
-    path('positions/bulk-upload/', PositionBulkUploadView.as_view(), name='positions-bulk-upload'),
-    path('employees/bulk-upload/', EmployeeBulkUploadView.as_view(), name='employees-bulk-upload'),
     path('', include(router.urls)),
 ]

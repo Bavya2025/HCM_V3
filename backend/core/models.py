@@ -629,7 +629,8 @@ class Project(models.Model):
 
     @property
     def is_currently_active(self):
-        return self.status == 'Active' and not self.is_expired
+        status_upper = (self.status or '').upper()
+        return status_upper in ('ACTIVE', 'PLANNING') and not self.is_expired
 
     def __str__(self):
         return self.name
@@ -938,13 +939,16 @@ def sync_office_to_visiting_location(sender, instance, **kwargs):
         'contact_number': instance.phone or ""
     }
 
-    # Check if instance is a Facility or has a facility child (multi-table inheritance)
-    if isinstance(instance, Facility):
+    # Copy latitude/longitude from Office or Facility (both share these fields)
+    if hasattr(instance, 'latitude') and instance.latitude is not None:
         defaults['latitude'] = instance.latitude
+    if hasattr(instance, 'longitude') and instance.longitude is not None:
         defaults['longitude'] = instance.longitude
-    elif hasattr(instance, 'facility') and instance.facility:
-        defaults['latitude'] = instance.facility.latitude
-        defaults['longitude'] = instance.facility.longitude
+
+    # Fallback to child facility record if the data is only stored there (extra safety)
+    if not defaults.get('latitude') and hasattr(instance, 'facility') and instance.facility:
+        if instance.facility.latitude: defaults['latitude'] = instance.facility.latitude
+        if instance.facility.longitude: defaults['longitude'] = instance.facility.longitude
 
     VisitingLocation.objects.update_or_create(
         office_ref=instance,

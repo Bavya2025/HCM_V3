@@ -1445,8 +1445,8 @@ class OfficeViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelViewSe
     ordering = ['name']
 
     def get_queryset(self):
-        # Use ScopedViewSetMixin's filtering first
-        queryset = super().get_queryset().select_related('level', 'parent', 'cluster')
+        # Use ScopedViewSetMixin's filtering and prefetch projects for UI tags
+        queryset = super().get_queryset().select_related('level', 'parent', 'cluster').prefetch_related('projects')
         
         # Manual query param filtering for level and status
         level = self.request.query_params.get('level') or self.request.query_params.get('office_level')
@@ -1459,6 +1459,10 @@ class OfficeViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelViewSe
         status_param = self.request.query_params.get('status')
         if status_param and status_param != 'all':
             queryset = queryset.filter(status=status_param)
+            
+        office_id = self.request.query_params.get('id') or self.request.query_params.get('office_id')
+        if office_id and office_id != 'all' and str(office_id).isdigit():
+            queryset = queryset.filter(id=office_id)
             
         country_id = self.request.query_params.get('country')
         if country_id and country_id != 'all':
@@ -1930,6 +1934,168 @@ class PositionViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelView
         from .serializers import PositionDropdownSerializer
         return Response(PositionDropdownSerializer(positions, many=True).data)
 
+    @action(detail=False, methods=['post'], url_path='bulk-upload')
+    def bulk_upload(self, request):
+        data = request.data
+        if not isinstance(data, list):
+            return Response({'error': 'Expected a list of data rows.'}, status=400)
+
+        created_count = 0
+        updated_count = 0
+        errors = []
+
+        # Recursive/Relationship Caches
+        office_cache = {}
+        dept_cache = {}
+        section_cache = {}
+        role_cache = {}
+        job_cache = {}
+        level_cache = {}
+        created_positions = [] 
+
+        with transaction.atomic():
+            for index, row in enumerate(data):
+                try:
+                    with transaction.atomic(): 
+                        # 1. Identity
+                        name = str(row.get('Position Title') or row.get('name') or '').strip()
+                        code = str(row.get('Position Code') or row.get('code') or '').strip()
+                        if not name: raise Exception("Position Title is required.")
+
+                        # 2. Relationship Resolution: Role
+                        role_val = str(row.get('Role Name') or row.get('role') or '').strip()
+                        if not role_val:
+                            raise Exception("Role Name is required.")
+                        
+                        if role_val not in role_cache:
+                            role_obj = Role.objects.filter(Q(code=role_val) | Q(name=role_val)).first()
+                            if not role_obj:
+                                raise Exception(f"Role '{role_val}' not found.")
+                            role_cache[role_val] = role_obj
+                        role = role_cache[role_val]
+
+                        # 3. Relationship Resolution: Office
+                        office_val = str(row.get('Assign to Office / Unit') or row.get('office') or '').strip()
+                        office = None
+                        if office_val:
+                            if office_val not in office_cache:
+                                off_obj = Office.objects.filter(Q(code=office_val) | Q(name=office_val)).first()
+                                if not off_obj:
+                                    off_obj = Office.objects.filter(name=office_val).first()
+                                    if not off_obj:
+                                        raise Exception(f"Office '{office_val}' not found.")
+                                office_cache[office_val] = off_obj
+                            office = office_cache[office_val]
+
+                        # 4. Relationship Resolution: Department
+                        dept_val = str(row.get('department') or row.get('Department') or '').strip()
+                        dept = None
+                        if dept_val:
+                            dept_key = f"{office.id if office else 'global'}|{dept_val}"
+                            if dept_key not in dept_cache:
+                                qs = Department.objects.filter(name=dept_val)
+                                if office: qs = qs.filter(office=office)
+                                dept_obj = qs.first()
+                                if not dept_obj:
+                                    raise Exception(f"Department '{dept_val}' not found.")
+                                dept_cache[dept_key] = dept_obj
+                            dept = dept_cache[dept_key]
+
+                        # 4. Section (by name)
+                        sec_val = str(row.get('Section / Team') or row.get('section') or '').strip()
+                        sec = None
+                        if sec_val:
+                            key = f"{sec_val}_{dept.id if dept else 'none'}"
+                            if key not in section_cache:
+                                sec_obj = Section.objects.filter(name=sec_val, department=dept).first()
+                                section_cache[key] = sec_obj
+                            sec = section_cache[key]
+
+                        # 6. Job (by name)
+                        job_val = str(row.get('Job Profile (Specific Role)') or row.get('job') or '').strip()
+                        job = None
+                        if job_val:
+                            if job_val not in job_cache:
+                                job_obj = Job.objects.filter(name=job_val, role=role).first()
+                                job_cache[job_val] = job_obj
+                            job = job_cache[job_val]
+
+                        # 7. Level
+                        level_val = str(row.get('Designation Rank / Level') or row.get('level') or '').strip()
+                        level = None
+                        if level_val:
+                            if level_val not in level_cache:
+                                level_obj = PositionLevel.objects.filter(name=level_val).first()
+                                level_cache[level_val] = level_obj
+                            level = level_cache[level_val]
+
+                        # 7. Atomic Write (Upsert)
+                        defaults = {
+                            'name': name,
+                            'office': office,
+                            'department': dept,
+                            'section': sec,
+                            'role': role,
+                            'job': job,
+                            'level': level,
+                            'status': str(row.get('status') or 'Active')
+                        }
+                        start_date = str(row.get('Activation Date') or row.get('start_date') or '').strip()
+                        if start_date and start_date != '-':
+                            defaults['start_date'] = start_date
+
+                        # Predict Project Code Suffix Mutation for unique matching
+                        project_code = None
+                        if dept and dept.project:
+                            project_code = dept.project.code
+                        elif sec and sec.project:
+                            project_code = sec.project.code
+                        elif office:
+                            project = office.projects.first()
+                            if project: project_code = project.code
+                            
+                        search_code = code
+                        if code and project_code and project_code not in code:
+                            search_code = f"{code}-{project_code}"
+
+                        if search_code:
+                            obj, created = Position.objects.update_or_create(code=search_code, defaults=defaults)
+                        else:
+                            obj, created = Position.objects.update_or_create(name=name, department=dept, defaults=defaults)
+                        
+                        if created: created_count += 1
+                        else: updated_count += 1
+                        created_positions.append((obj, row, index))
+                        
+                except Exception as e:
+                    errors.append({'row': index + 2, 'reason': str(e), 'data': row})
+
+            # Pass 2: Hierarchy Linking
+            for obj, row, index in created_positions:
+                try:
+                    reporting_vals = str(row.get('Reporting To (Codes)') or row.get('reporting_to') or '').strip()
+                    if reporting_vals:
+                        reporting_objs = []
+                        codes = [c.strip() for c in reporting_vals.replace(';', ',').split(',') if c.strip()]
+                        for c in codes:
+                            boss = Position.objects.filter(Q(code__iexact=c) | Q(code__startswith=f"{c}-") | Q(name__iexact=c)).first()
+                            if boss:
+                                reporting_objs.append(boss)
+                            else:
+                                raise Exception(f"Reporting head position '{c}' not found.")
+                        if reporting_objs:
+                            obj.reporting_to.set(reporting_objs)
+                except Exception as e:
+                    errors.append({'row': index + 2, 'reason': f"Hierarchy error: {str(e)}", 'data': row})
+
+        return Response({
+            'success': len(errors) == 0,
+            'created': created_count,
+            'updated': updated_count,
+            'errors': errors,
+            'total_processed': len(data)
+        })
+
 class EmployeeViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelViewSet):
     queryset = Employee.objects.all()
     serializer_class = EmployeeSerializer
@@ -2193,6 +2359,85 @@ class EmployeeViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelView
             'email_sent': True,
             'username': employee.user.username,
             'password': new_password
+        })
+
+    @action(detail=False, methods=['post'], url_path='bulk-upload')
+    def bulk_upload(self, request):
+        data = request.data
+        if not isinstance(data, list):
+            return Response({'error': 'Expected a list of data rows.'}, status=400)
+
+        created_count = 0
+        updated_count = 0
+        errors = []
+
+        with transaction.atomic():
+            for index, row in enumerate(data):
+                try:
+                    with transaction.atomic():
+                        # 1. Identity & Core Fields
+                        code = str(row.get('employee_code') or row.get('Employee Code *') or '').strip()
+                        name = str(row.get('name') or row.get('Name *') or '').strip()
+                        
+                        if not code or not name:
+                            raise Exception("Employee Code and Name are mandatory.")
+
+                        defaults = {
+                            'name': name,
+                            'email': str(row.get('email') or row.get('Email *') or '').strip(),
+                            'phone': str(row.get('phone') or row.get('Phone *') or '').strip(),
+                            'gender': str(row.get('gender') or row.get('Gender *') or '').strip(),
+                            'father_name': str(row.get('father_name') or row.get('Father Name') or '').strip(),
+                            'mother_name': str(row.get('mother_name') or row.get('Mother Name') or '').strip(),
+                            'personal_email': str(row.get('personal_email') or '').strip(),
+                            'address': str(row.get('address') or row.get('Address') or '').strip(),
+                            'employment_type': str(row.get('employment_type') or row.get('Employment Type *') or 'Permanent').strip(),
+                            'status': str(row.get('status') or 'Active').strip(),
+                        }
+
+                        # Dates
+                        hire_date = row.get('hire_date') or row.get('Joining Date *')
+                        dob = row.get('date_of_birth') or row.get('Date of Birth *')
+                        if hire_date: defaults['hire_date'] = hire_date
+                        if dob: defaults['date_of_birth'] = dob
+
+                        # 2. Upsert Employee
+                        obj, created = Employee.objects.update_or_create(
+                            employee_code=code,
+                            defaults=defaults
+                        )
+
+                        # 3. Position Tagging (M2M)
+                        pos_codes_str = str(row.get('Position Codes') or row.get('positions') or '').strip()
+                        if pos_codes_str:
+                            pos_objs = []
+                            pos_codes = [c.strip() for c in pos_codes_str.replace(';', ',').split(',') if c.strip()]
+                            for pc in pos_codes:
+                                pos = Position.objects.filter(Q(code__iexact=pc) | Q(code__startswith=f"{pc}-")).first()
+                                if pos:
+                                    pos_objs.append(pos)
+                                else:
+                                    pos_by_name = Position.objects.filter(name__iexact=pc).first()
+                                    if pos_by_name: 
+                                        pos_objs.append(pos_by_name)
+                                    else:
+                                        raise Exception(f"Position '{pc}' not found.")
+                            
+                            if pos_objs:
+                                obj.positions.set(pos_objs)
+
+                        if created: created_count += 1
+                        else: updated_count += 1
+
+                except Exception as e:
+                    errors.append({'row': index + 2, 'reason': str(e), 'data': row})
+
+        return Response({
+            'success': len(errors) == 0,
+            'created': created_count,
+            'updated': updated_count,
+            'errors': errors,
+            'total_processed': len(data)
         })
 
 
@@ -3020,278 +3265,6 @@ class GeoFullHierarchyView(APIView):
         )
         serializer = GeoContinentNestedSerializer(continents, many=True)
         return Response(serializer.data)
-
-class PositionBulkUploadView(APIView):
-    """
-    High-integrity bulk upload engine for Positions.
-    Maps human-readable names from Excel (Offices, Roles, Depts) to database IDs.
-    """
-    permission_classes = [permissions.IsAuthenticated]
-
-    def post(self, request):
-        try:
-            return self._handle_post(request)
-        except Exception as e:
-            import traceback
-            with open('bulk_upload_debug.log', 'w') as f:
-                f.write(traceback.format_exc())
-            return Response({'error': str(e), 'details': traceback.format_exc()}, status=500)
-
-    def _handle_post(self, request):
-        data = request.data
-        if not isinstance(data, list):
-            return Response({'error': 'Expected a list of data rows.'}, status=400)
-
-        created_count = 0
-        updated_count = 0
-        errors = []
-
-        # Recursive/Relationship Caches
-        office_cache = {}
-        dept_cache = {}
-        section_cache = {}
-        role_cache = {}
-        job_cache = {}
-        level_cache = {}
-        created_positions = [] # Pass 1 Store for Pass 2 Linking
-
-        with transaction.atomic():
-            for index, row in enumerate(data):
-                try:
-                    with transaction.atomic(): # Savepoint for each row to prevent TransactionManagementError
-                        # 1. Identity
-                        name = str(row.get('Position Title') or row.get('name') or '').strip()
-                        code = str(row.get('Position Code') or row.get('code') or '').strip()
-                        if not name: raise Exception("Position Title is required.")
-
-                        # 2. Relationship Resolution: Role
-                        role_val = str(row.get('Role Name') or row.get('role') or '').strip()
-                        if not role_val:
-                            raise Exception("Role Name is required.")
-                        
-                        if role_val not in role_cache:
-                            role_obj = Role.objects.filter(Q(code=role_val) | Q(name=role_val)).first()
-                            if not role_obj:
-                                raise Exception(f"Role '{role_val}' not found.")
-                            role_cache[role_val] = role_obj
-                        role = role_cache[role_val]
-
-                        # 3. Relationship Resolution: Office
-                        office_val = str(row.get('Assign to Office / Unit') or row.get('office') or '').strip()
-                        office = None
-                        if office_val:
-                            if office_val not in office_cache:
-                                off_obj = Office.objects.filter(Q(code=office_val) | Q(name=office_val)).first()
-                                if not off_obj:
-                                    # Fallback search without code
-                                    off_obj = Office.objects.filter(name=office_val).first()
-                                    if not off_obj:
-                                        raise Exception(f"Office '{office_val}' not found.")
-                                office_cache[office_val] = off_obj
-                            office = office_cache[office_val]
-
-                        # 4. Relationship Resolution: Department
-                        dept_val = str(row.get('department') or row.get('Department') or '').strip()
-                        dept = None
-                        if dept_val:
-                            dept_key = f"{office.id if office else 'global'}|{dept_val}"
-                            if dept_key not in dept_cache:
-                                qs = Department.objects.filter(name=dept_val)
-                                if office: qs = qs.filter(office=office)
-                                dept_obj = qs.first()
-                                if not dept_obj:
-                                    raise Exception(f"Department '{dept_val}' not found.")
-                                dept_cache[dept_key] = dept_obj
-                            dept = dept_cache[dept_key]
-
-                        # 4. Section (by name)
-                        sec_val = str(row.get('Section / Team') or row.get('section') or '').strip()
-                        sec = None
-                        if sec_val:
-                            key = f"{sec_val}_{dept.id if dept else 'none'}"
-                            if key not in section_cache:
-                                sec_obj = Section.objects.filter(name=sec_val, department=dept).first()
-                                section_cache[key] = sec_obj
-                            sec = section_cache[key]
-
-                        # 6. Job (by name)
-                        job_val = str(row.get('Job Profile (Specific Role)') or row.get('job') or '').strip()
-                        job = None
-                        if job_val:
-                            if job_val not in job_cache:
-                                job_obj = Job.objects.filter(name=job_val, role=role).first()
-                                job_cache[job_val] = job_obj
-                            job = job_cache[job_val]
-
-                        # 7. Level
-                        level_val = str(row.get('Designation Rank / Level') or row.get('level') or '').strip()
-                        level = None
-                        if level_val:
-                            if level_val not in level_cache:
-                                level_obj = PositionLevel.objects.filter(name=level_val).first()
-                                level_cache[level_val] = level_obj
-                            level = level_cache[level_val]
-
-                        start_date = str(row.get('Activation Date') or row.get('start_date') or '').strip()
-                        if not start_date or start_date == '-':
-                            start_date = None
-
-                        # 7. Atomic Write (Upsert)
-                        defaults = {
-                            'name': name,
-                            'office': office,
-                            'department': dept,
-                            'section': sec,
-                            'role': role,
-                            'job': job,
-                            'level': level,
-                            'status': str(row.get('status') or 'Active')
-                        }
-                        if start_date:
-                            defaults['start_date'] = start_date
-
-                        # Predict Project Code Suffix Mutation for unique matching
-                        project_code = None
-                        if dept and dept.project:
-                            project_code = dept.project.code
-                        elif sec and sec.project:
-                            project_code = sec.project.code
-                        elif office:
-                            project = office.projects.first()
-                            if project: project_code = project.code
-                            
-                        # If user gave exact code without suffix, it mutated in DB. Simulate it.
-                        search_code = code
-                        if code and project_code and project_code not in code:
-                            search_code = f"{code}-{project_code}"
-
-                        if search_code:
-                            obj, created = Position.objects.update_or_create(code=search_code, defaults=defaults)
-                        else:
-                            obj, created = Position.objects.update_or_create(name=name, department=dept, defaults=defaults)
-                        
-                        if created: created_count += 1
-                        else: updated_count += 1
-                        
-                        created_positions.append((obj, row, index))
-                        
-                except Exception as e:
-                    errors.append({'row': index + 2, 'reason': str(e), 'data': row})
-
-            # Pass 2: Hierarchy Linking (After all records exist)
-            for obj, row, index in created_positions:
-                try:
-                    reporting_vals = str(row.get('Reporting To (Codes)') or row.get('reporting_to') or '').strip()
-                    if reporting_vals:
-                        reporting_objs = []
-                        codes = [c.strip() for c in reporting_vals.replace(';', ',').split(',') if c.strip()]
-                        for c in codes:
-                            # Use case-insensitive matching for better reliability
-                            boss = Position.objects.filter(Q(code__iexact=c) | Q(code__startswith=f"{c}-") | Q(name__iexact=c)).first()
-                            if boss:
-                                reporting_objs.append(boss)
-                            else:
-                                raise Exception(f"Reporting head position '{c}' not found.")
-                        
-                        if reporting_objs:
-                            obj.reporting_to.set(reporting_objs)
-                except Exception as e:
-                    # Don't fail the whole batch for a bad link, but log it
-                    errors.append({'row': index + 2, 'reason': f"Hierarchy error: {str(e)}", 'data': row})
-
-        return Response({
-            'success': len(errors) == 0,
-            'created': created_count,
-            'updated': updated_count,
-            'errors': errors,
-            'total_processed': len(data)
-        })
-
-class EmployeeBulkUploadView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def post(self, request):
-        data = request.data
-        if not isinstance(data, list):
-            return Response({'error': 'Expected a list of data rows.'}, status=400)
-
-        created_count = 0
-        updated_count = 0
-        errors = []
-
-        with transaction.atomic():
-            for index, row in enumerate(data):
-                try:
-                    with transaction.atomic():
-                        # 1. Identity & Core Fields
-                        code = str(row.get('employee_code') or row.get('Employee Code *') or '').strip()
-                        name = str(row.get('name') or row.get('Name *') or '').strip()
-                        
-                        if not code or not name:
-                            raise Exception("Employee Code and Name are mandatory.")
-
-                        defaults = {
-                            'name': name,
-                            'email': str(row.get('email') or row.get('Email *') or '').strip(),
-                            'phone': str(row.get('phone') or row.get('Phone *') or '').strip(),
-                            'gender': str(row.get('gender') or row.get('Gender *') or '').strip(),
-                            'father_name': str(row.get('father_name') or row.get('Father Name') or '').strip(),
-                            'mother_name': str(row.get('mother_name') or row.get('Mother Name') or '').strip(),
-                            'personal_email': str(row.get('personal_email') or '').strip(),
-                            'address': str(row.get('address') or row.get('Address') or '').strip(),
-                            'employment_type': str(row.get('employment_type') or row.get('Employment Type *') or 'Permanent').strip(),
-                            'status': str(row.get('status') or 'Active').strip(),
-                        }
-
-                        # Dates
-                        hire_date = row.get('hire_date') or row.get('Joining Date *')
-                        dob = row.get('date_of_birth') or row.get('Date of Birth *')
-                        if hire_date: defaults['hire_date'] = hire_date
-                        if dob: defaults['date_of_birth'] = dob
-
-                        # 2. Upsert Employee
-                        obj, created = Employee.objects.update_or_create(
-                            employee_code=code,
-                            defaults=defaults
-                        )
-
-                        # 3. Position Tagging (M2M)
-                        pos_codes_str = str(row.get('Position Codes') or row.get('positions') or '').strip()
-                        if pos_codes_str:
-                            pos_objs = []
-                            # Split by comma or semicolon
-                            pos_codes = [c.strip() for c in pos_codes_str.replace(';', ',').split(',') if c.strip()]
-                            for pc in pos_codes:
-                                # Match exact code or suffixed code (POS-001 or POS-001-108-OPS)
-                                pos = Position.objects.filter(Q(code__iexact=pc) | Q(code__startswith=f"{pc}-")).first()
-                                if pos:
-                                    pos_objs.append(pos)
-                                else:
-                                    # Fallback to name search if code not found (case-insensitive)
-                                    pos_by_name = Position.objects.filter(name__iexact=pc).first()
-                                    if pos_by_name: 
-                                        pos_objs.append(pos_by_name)
-                                    else:
-                                        raise Exception(f"Position '{pc}' not found.")
-                            
-                            if pos_objs:
-                                obj.positions.set(pos_objs)
-
-                        if created: created_count += 1
-                        else: updated_count += 1
-
-                except Exception as e:
-                    errors.append({'row': index + 2, 'reason': str(e), 'data': row})
-
-        return Response({
-            'success': len(errors) == 0,
-            'created': created_count,
-            'updated': updated_count,
-            'errors': errors,
-            'total_processed': len(data)
-        })
-
-
 
 from .models import AuditLog
 from core.serializers import AuditLogSerializer

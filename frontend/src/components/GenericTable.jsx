@@ -150,6 +150,9 @@ const GenericTable = ({ renderTableData, customData = null }) => {
         setFilters(getInitialFilters(true));
         sessionStorage.removeItem(`filters_${activeSection}`);
         sessionStorage.removeItem(`last_fetch_${activeSection}`);
+        // FORCE a visible fetch by setting loading manually before the effect triggers
+        setLoading(true);
+        fetchData(false, true, 1, getInitialFilters(true), true);
     };
 
     const prevSectionRef = useRef(activeSection);
@@ -340,8 +343,11 @@ const GenericTable = ({ renderTableData, customData = null }) => {
     const sectionChangedSinceLastFetch = lastFetchFilters.current === null;
     const isLoadingAny = loading || (isSyncing === activeSection) || (!customData && (isFirstRender.current || sectionChangedSinceLastFetch));
 
+    // SMART DATA ENGINE: 
+    // Prioritize contextData (the filtered set) if available (even if empty).
+    // Fallback to getFallbackData() ONLY for the very first load or while the section is initializing.
     const rawData = customData || (
-        (contextData && Array.isArray(contextData) && contextData.length > 0)
+        (contextData && Array.isArray(contextData) && (contextData.length > 0 || !isLoadingAny))
             ? contextData
             : (isLoadingAny ? (getFallbackData() || []) : [])
     );
@@ -484,13 +490,12 @@ const GenericTable = ({ renderTableData, customData = null }) => {
         }
 
         // Status filter: Proceed with local filtering as a second pass/fallback
-        // ONLY if not a server-filtered section to avoid logic mismatches
-        if (!isServerSection && statusFilter !== 'all') {
+        if (statusFilter !== 'all') {
             result = result.filter(item => (item.status || 'Active') === statusFilter);
         }
 
         // Office filter
-        if (!isServerSection && officeFilter !== 'all') {
+        if (officeFilter !== 'all') {
             result = result.filter(item => {
                 // For Employees: Look up via positions_details
                 if (activeSection === 'employees' && item.positions_details) {
@@ -518,7 +523,7 @@ const GenericTable = ({ renderTableData, customData = null }) => {
         }
 
         // Department filter
-        if (!isServerSection && departmentFilter !== 'all') {
+        if (departmentFilter !== 'all') {
             result = result.filter(item => {
                 if (matchesId(item.department, departmentFilter) || matchesId(item.department_id, departmentFilter)) return true;
 
@@ -532,7 +537,7 @@ const GenericTable = ({ renderTableData, customData = null }) => {
         }
 
         // Section filter
-        if (!isServerSection && sectionFilter !== 'all') {
+        if (sectionFilter !== 'all') {
             result = result.filter(item => {
                 if (matchesId(item.section, sectionFilter) || matchesId(item.section_id, sectionFilter)) return true;
 
@@ -555,7 +560,7 @@ const GenericTable = ({ renderTableData, customData = null }) => {
         if (roleFilter !== 'all') {
             result = result.filter(item => matchesHierarchy(item, 'all', 'all', roleFilter, 'all'));
         }
-        if (!isServerSection && jobFilter !== 'all') {
+        if (jobFilter !== 'all') {
             result = result.filter(item => matchesHierarchy(item, 'all', 'all', 'all', jobFilter));
         }
 
@@ -607,20 +612,20 @@ const GenericTable = ({ renderTableData, customData = null }) => {
             );
         }
 
-        if (!isServerSection && districtFilter !== 'all') {
+        if (districtFilter !== 'all') {
             result = result.filter(item =>
                 item && (matchesId(item.district, districtFilter) || matchesId(item.district_id, districtFilter) || (activeSection === 'geo-districts' && matchesId(item.id, districtFilter)))
             );
         }
 
-        if (!isServerSection && mandalFilter !== 'all') {
+        if (mandalFilter !== 'all') {
             result = result.filter(item =>
                 item && (matchesId(item.mandal, mandalFilter) || matchesId(item.mandal_id, mandalFilter) || ((activeSection === 'geo-mandals' || activeSection === 'geo-clusters') && matchesId(item.id, mandalFilter)))
             );
         }
 
         // Office Level Filter
-        if (!isServerSection && officeLevelFilter !== 'all') {
+        if (officeLevelFilter !== 'all') {
             const selectedLevelObj = (orgLevels || []).find(l => matchesId(l.id, officeLevelFilter));
             const selectedLevelName = selectedLevelObj ? selectedLevelObj.name : '';
 
@@ -711,7 +716,7 @@ const GenericTable = ({ renderTableData, customData = null }) => {
         });
 
         // Position Level Filter
-        if (!isServerSection && positionLevelFilter !== 'all') {
+        if (positionLevelFilter !== 'all') {
             result = result.filter(item =>
                 matchesId(item.level, positionLevelFilter) ||
                 matchesId(item.level_id, positionLevelFilter)
@@ -953,7 +958,9 @@ const GenericTable = ({ renderTableData, customData = null }) => {
                             <option value="all">All Status</option>
                             <option value="Active">Active</option>
                             <option value="Inactive">Inactive</option>
+                            <option value="Blocked">Blocked</option>
                             {activeSection === 'employees' && <option value="Suspicious">Suspicious</option>}
+                            {activeSection === 'employees' && <option value="Terminated">Terminated</option>}
                         </select>
                     )}
 

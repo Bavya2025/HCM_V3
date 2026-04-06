@@ -826,6 +826,7 @@ export const DataProvider = ({ children }) => {
         setSelectedEmployee(null);
     };
 
+    const lastRequestedUrl = React.useRef(new Map()); 
     const activeRequests = React.useRef(new Map());
 
     const fetchData = async (silent = false, applyState = true, page = 1, filters = {}, force = false) => {
@@ -891,22 +892,25 @@ export const DataProvider = ({ children }) => {
                 }
 
                 // --- DEDUPLICATION LOGIC ---
-                // Safe re-implementation with error handling for secondary consumers
                 if (activeRequests.current.has(url)) {
-                    console.log(`[DataDedup] ⚡ Reusing in-flight request for: ${url}`);
-                    // Catch allows secondary callers to safely ignore errors (primary caller handles reporting)
                     return activeRequests.current.get(url).catch(() => null);
                 }
 
+                // Track this as the LATEST request for this section
+                lastRequestedUrl.current.set(requestSection, url);
+
                 const requestPromise = api.get(url, { force }).finally(() => {
-                    // Cleanup when done
                     activeRequests.current.delete(url);
                 });
 
-                // Store the promise
                 activeRequests.current.set(url, requestPromise);
-
                 const result = await requestPromise;
+
+                // --- RACE CONDITION CHECK ---
+                if (lastRequestedUrl.current.get(requestSection) !== url) {
+                    console.warn(`[DataFetch] 🛑 Ignoring stale response for ${requestSection} (Expected ${lastRequestedUrl.current.get(requestSection)})`);
+                    return null;
+                }
 
                 let dataToSet = [];
                 let paginationInfo = { count: 0, next: null, previous: null, current: 1 };
@@ -955,11 +959,11 @@ export const DataProvider = ({ children }) => {
             } catch (err) {
                 const sectionName = section ? section.name : 'requested';
                 console.error(`Failed to fetch ${requestSection}:`, err);
-                if (!silent) {
-                    if (activeSectionRef.current === requestSection) {
-                        setData([]);
-                        showNotification(`Failed to load ${sectionName} data`, 'error');
-                    }
+                
+                // Always notify on errors that affect the ACTIVE view, even if fetch was silent
+                if (activeSectionRef.current === requestSection) {
+                    setData([]);
+                    showNotification(`Failed to load ${sectionName} data`, 'error');
                 }
                 return null;
             } finally {

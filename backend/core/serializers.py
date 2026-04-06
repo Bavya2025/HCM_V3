@@ -502,7 +502,8 @@ class OfficeSerializer(serializers.ModelSerializer):
     project_name = serializers.SerializerMethodField()
 
     def get_assigned_projects(self, obj):
-        # Automatically hide expired/inactive projects from UI tags
+        # Show projects that are Active OR currently in the Planning phase
+        # Use is_currently_active property for consistency
         return [p.name for p in obj.projects.all() if p.is_currently_active]
 
     def get_project_code(self, obj):

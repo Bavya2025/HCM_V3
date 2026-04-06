@@ -1765,7 +1765,7 @@ const ModalForm = () => {
                                             value={formData.latitude || ''}
                                             onChange={(e) => {
                                                 const val = e.target.value;
-                                                setFormData({ ...formData, latitude: val ? parseFloat(parseFloat(val).toFixed(4)) : '' });
+                                                setFormData({ ...formData, latitude: val ? parseFloat(parseFloat(val).toFixed(4)) : null });
                                             }}
                                         />
                                     </div>
@@ -1782,7 +1782,7 @@ const ModalForm = () => {
                                             value={formData.longitude || ''}
                                             onChange={(e) => {
                                                 const val = e.target.value;
-                                                setFormData({ ...formData, longitude: val ? parseFloat(parseFloat(val).toFixed(4)) : '' });
+                                                setFormData({ ...formData, longitude: val ? parseFloat(parseFloat(val).toFixed(4)) : null });
                                             }}
                                         />
                                     </div>
