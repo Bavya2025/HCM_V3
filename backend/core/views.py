@@ -2382,10 +2382,15 @@ class EmployeeViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelView
                         if not code or not name:
                             raise Exception("Employee Code and Name are mandatory.")
 
+                        # Helper for unique fields
+                        def clean_unique(val):
+                            s = str(val or '').strip()
+                            return s if s else None
+
                         defaults = {
                             'name': name,
-                            'email': str(row.get('email') or row.get('Email *') or '').strip(),
-                            'phone': str(row.get('phone') or row.get('Phone *') or '').strip(),
+                            'email': clean_unique(row.get('email') or row.get('Email *')),
+                            'phone': clean_unique(row.get('phone') or row.get('Phone *')),
                             'gender': str(row.get('gender') or row.get('Gender *') or '').strip(),
                             'father_name': str(row.get('father_name') or row.get('Father Name') or '').strip(),
                             'mother_name': str(row.get('mother_name') or row.get('Mother Name') or '').strip(),
