@@ -1,0 +1,9 @@
+[2026-03-11 09:13:53 +0000] [6478] [INFO] Starting gunicorn 25.1.0
+[2026-03-11 09:13:53 +0000] [6478] [INFO] Listening at: http://127.0.0.1:8001 (6478)
+[2026-03-11 09:13:53 +0000] [6478] [INFO] Using worker: sync
+[2026-03-11 09:13:53 +0000] [6478] [INFO] Control socket listening at /home/user/ERPS - Copy 19/backend/gunicorn.ctl
+[2026-03-11 09:13:53 +0000] [6480] [INFO] Booting worker with pid: 6480
+[2026-03-11 09:20:55 +0000] [6480] [INFO] Worker exiting (pid: 6480)
+[2026-03-11 09:20:55 +0000] [6478] [INFO] Handling signal: term
+[2026-03-11 09:20:55 +0000] [6478] [INFO] Worker (pid:6480) was sent SIGTERM!
+[2026-03-11 09:20:56 +0000] [6478] [INFO] Shutting down: Master

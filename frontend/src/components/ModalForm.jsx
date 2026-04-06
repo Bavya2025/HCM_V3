@@ -1,0 +1,5541 @@
+import React, { useEffect } from 'react';
+import {
+    Layers,
+    Edit,
+    Building,
+    Building2,
+    FileText,
+    FileDigit,
+    Users,
+    Phone,
+    Mail,
+    Navigation,
+    Globe,
+    MapPin,
+    Briefcase,
+    Calendar,
+    Map,
+    Home,
+    FolderKanban,
+    Plus,
+    Sparkles,
+    ShieldCheck,
+    History,
+    Clock,
+    Wallet,
+    Banknote,
+    Navigation2,
+    ClipboardList,
+    BarChart3,
+    Settings,
+    GraduationCap,
+    TrendingUp,
+    UserCircle,
+    CheckSquare,
+    UserSquare2,
+    Network,
+    LayoutGrid,
+    Link,
+    User,
+    Upload,
+    ShieldAlert,
+    ArrowRightLeft,
+    X,
+    CreditCard,
+    Shield,
+    Car,
+    Heart,
+    Gift,
+    UserPlus,
+    Activity
+} from 'lucide-react';
+import SearchableSelect from './SearchableSelect';
+import { useData } from '../context/DataContext';
+import api from '../api';
+import GeoMapPicker from './GeoMapPicker';
+
+const ModalForm = () => {
+    const {
+        data,
+        modalType,
+        formData,
+        setFormData,
+        orgLevels,
+        offices,
+        departments,
+        sections,
+        jobFamilies,
+        roles,
+        jobs,
+        positions,
+        allEmployees,
+        selectedEmployee,
+        projects,
+        facilityMasters,
+        roleTypes,
+        tasks,
+        documentTypes,
+        geoContinents,
+        geoCountries,
+        geoStatesData,
+        geoDistrictsData,
+        geoMandals,
+        geoClusters,
+        handleAdd,
+        positionLevels,
+        user
+    } = useData();
+
+    // State for validation errors
+    const [validationErrors, setValidationErrors] = React.useState({});
+
+
+
+    // Derived values for easy access in forms
+    const selectedMaster = facilityMasters?.find(m => String(m.id) === String(formData.facility_master));
+    const selectedProj = projects?.find(p => {
+        if (formData.project) return String(p.id) === String(formData.project);
+        if (selectedMaster) return String(p.id) === String(selectedMaster.project);
+        return false;
+    });
+    const currentLevel = orgLevels?.find(l => String(l.id) === String(formData.level));
+
+    const showValidationError = (fieldName, message) => {
+        setValidationErrors(prev => ({ ...prev, [fieldName]: message }));
+        setTimeout(() => {
+            setValidationErrors(prev => {
+                const newErrors = { ...prev };
+                delete newErrors[fieldName];
+                return newErrors;
+            });
+        }, 2000); // Clear after 2 seconds
+    };
+
+    // Helper to determine if a field is locked by Project Scope
+    const isFieldLocked = (field) => {
+        if (!selectedProj || currentLevel?.level_code !== 'L9') return false;
+        const scope = selectedProj.geo_scope_level;
+        // Hierarchy of scopes
+        const levels = ['Territory', 'Country', 'State', 'District', 'Mandal', 'Local Body', 'Settlement'];
+
+        // Map field names to their corresponding level index in the hierarchy
+        const fieldLevelMap = {
+            'country_name': 1, // Index of 'Country'
+            'state_name': 2,   // Index of 'State'
+            'district_name': 3, // Index of 'District'
+            'mandal_name': 4   // Index of 'Mandal'
+        };
+
+        const scopeIndex = levels.indexOf(scope);
+        const fieldIndex = fieldLevelMap[field];
+
+        if (scopeIndex === -1 || fieldIndex === undefined) return false;
+
+        // If scope is deeper or equal to the field level, it's locked
+        // e.g. Scope='State'(2) locks 'country_name'(1) and 'state_name'(2)
+        return scopeIndex >= fieldIndex;
+    };
+
+    // Reactivity: Auto-populate code prefix based on level for Offices
+    React.useEffect(() => {
+        if (modalType === 'Offices' && formData.level && !formData.id) {
+            const lvl = orgLevels?.find(l => String(l.id) === String(formData.level));
+            if (lvl && lvl.level_code !== 'L9' && (!formData.code || formData.code === '')) {
+                const initials = lvl.name.split(' ').map(n => n[0]).join('').toUpperCase();
+                const autoCode = `${initials}-`;
+                setFormData(prev => ({ ...prev, code: autoCode }));
+            }
+        }
+    }, [formData.level, orgLevels, modalType]);
+
+    React.useEffect(() => {
+        if (selectedProj && currentLevel?.level_code === 'L9') {
+            const scope = selectedProj.geo_scope_level;
+            const updates = {};
+            const shouldUpdate = (field, value) => formData[field] !== value && value;
+
+            // Define hierarchy checks
+            const isScopeAtLeast = (lvl) => {
+                const levels = ['Territory', 'Country', 'State', 'District', 'Mandal', 'Local Body', 'Settlement'];
+                return levels.indexOf(scope) >= levels.indexOf(lvl);
+            };
+
+            if (isScopeAtLeast('Country')) {
+                if (shouldUpdate('country_name', selectedProj.country_name)) updates.country_name = selectedProj.country_name;
+            }
+            if (isScopeAtLeast('State')) {
+                if (shouldUpdate('state_name', selectedProj.state_name)) updates.state_name = selectedProj.state_name;
+            }
+            if (isScopeAtLeast('District')) {
+                if (shouldUpdate('district_name', selectedProj.district_name)) updates.district_name = selectedProj.district_name;
+            }
+            if (isScopeAtLeast('Mandal')) {
+                if (shouldUpdate('mandal_name', selectedProj.mandal_name)) updates.mandal_name = selectedProj.mandal_name;
+            }
+
+            if (Object.keys(updates).length > 0) {
+                setFormData(prev => ({ ...prev, ...updates }));
+
+            }
+        }
+    }, [selectedProj, currentLevel, formData.country_name, formData.state_name, formData.district_name, formData.mandal_name, geoDistrictsData.length, geoMandals.length]);
+
+
+
+
+    const capitalize = (str) => {
+        if (typeof str !== 'string' || !str) return str;
+        return str.charAt(0).toUpperCase() + str.slice(1);
+    };
+
+    const validateCode = (value, maxLength = 16, fieldName = '') => {
+        // Allow only alphabets, numbers, and hyphen
+        const filtered = value.replace(/[^A-Za-z0-9-]/g, '');
+        if (filtered !== value && fieldName) {
+            showValidationError(fieldName, 'Only letters, numbers, and hyphens allowed');
+        }
+        return filtered.toUpperCase().slice(0, maxLength); // Codes are usually all caps
+    };
+
+    const validateNumbers = (value, maxLength = 20, fieldName = '') => {
+        // Allow only numbers
+        const filtered = value.replace(/[^0-9]/g, '');
+        if (filtered !== value && fieldName) {
+            showValidationError(fieldName, 'Only numbers (0-9) allowed');
+        }
+        if (filtered.length >= maxLength && value.length > maxLength && fieldName) {
+            showValidationError(fieldName, `Maximum ${maxLength} digits allowed`);
+        }
+        return filtered.slice(0, maxLength);
+    };
+
+    const validatePhone = (value, fieldName = '') => {
+        // Allow only numbers, max 10 digits (Indian standard)
+        const filtered = value.replace(/[^0-9]/g, '');
+        if (filtered !== value && fieldName) {
+            showValidationError(fieldName, 'Only numbers allowed');
+        }
+        if (filtered.length >= 10 && value.length > 10 && fieldName) {
+            showValidationError(fieldName, 'Maximum 10 digits allowed');
+        }
+        return filtered.slice(0, 10);
+    };
+
+    const generateNextCode = (prefix, collection, parentIdField = null, parentId = null) => {
+        let count = 0;
+        if (collection && Array.isArray(collection)) {
+            if (parentIdField && parentId) {
+                count = collection.filter(item => String(item[parentIdField]) === String(parentId)).length;
+            } else {
+                count = collection.length;
+            }
+        }
+        return `${prefix}-${String(count + 1).padStart(2, '0')}`;
+    };
+
+    const validateAlpha = (value, maxLength = 100, fieldName = '') => {
+        // Allow only alphabets and spaces
+        const filtered = value.replace(/[^A-Za-z\s]/g, '');
+        if (filtered !== value && fieldName) {
+            showValidationError(fieldName, 'Only letters and spaces allowed');
+        }
+        return capitalize(filtered).slice(0, maxLength);
+    };
+
+    const validateAlphaNumeric = (value, maxLength = 200, fieldName = '') => {
+        // Allow only alphabets, numbers, spaces, and hyphens
+        const filtered = value.replace(/[^A-Za-z0-9\s-]/g, '');
+        if (filtered !== value && fieldName) {
+            showValidationError(fieldName, 'Only letters, numbers, spaces, and hyphens allowed');
+        }
+        return capitalize(filtered).slice(0, maxLength);
+    };
+
+    const validateName = (value, maxLength = 100, fieldName = '') => {
+        // Disallow numbers and special characters - allow ONLY letters and spaces
+        let filtered = value.replace(/[^A-Za-z\s]/g, '');
+
+        // No spaces at front
+        if (filtered.startsWith(' ')) {
+            filtered = filtered.trimStart();
+        }
+
+        if (filtered !== value && fieldName) {
+            showValidationError(fieldName, 'Only letters and spaces allowed');
+        }
+        return capitalize(filtered).slice(0, maxLength);
+    };
+
+    const validateAddress = (value, maxLength = 500, fieldName = '') => {
+        // Disallow special characters - allow letters, numbers, and spaces
+        // Usually addresses need , . / - but user specifically asked to disallow special characters
+        let filtered = value.replace(/[^A-Za-z0-9\s]/g, '');
+
+        if (filtered !== value && fieldName) {
+            showValidationError(fieldName, 'Special characters are not allowed in address');
+        }
+        return capitalize(filtered).slice(0, maxLength);
+    };
+
+    const validateEmailStrict = (value, fieldName = '') => {
+        // Restrict to common patterns ending in .com or .in
+        let cleaned = value.replace(/[^A-Za-z0-9@._-]/g, '');
+        const originalLength = cleaned.length;
+
+        // Prevent typing characters after .com or .in
+        cleaned = cleaned.replace(/\.com[^.]*$/i, '.com').replace(/\.in[^.]*$/i, '.in');
+
+        if (cleaned.length < originalLength && fieldName) {
+            showValidationError(fieldName, 'Cannot add characters after .com or .in');
+        } else if (cleaned !== value && cleaned.length === originalLength && fieldName) {
+            showValidationError(fieldName, 'Invalid characters in email');
+        }
+
+        return cleaned.toLowerCase();
+    };
+
+    const isEmailValid = (email) => {
+        const re = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.(com|in)$/;
+        return re.test(String(email).toLowerCase());
+    };
+
+
+    const handleClusterNameChange = (val) => {
+        const newName = validateName(val, 100, 'geo_name');
+        setFormData(prev => ({ ...prev, name: newName }));
+    };
+
+    const validateEmail = (value, maxLength = 100, fieldName = '') => {
+        // Allow standard email characters
+        const filtered = value.replace(/[^A-Za-z0-9@._-]/g, '');
+        if (filtered !== value && fieldName) {
+            showValidationError(fieldName, 'Invalid characters in email');
+        }
+        return filtered.slice(0, maxLength);
+    };
+
+    // Reload task URL mappings when editing to get latest permissions
+    React.useEffect(() => {
+        const loadTaskUrlMappings = async () => {
+            if ((modalType === 'Task URLs' || modalType === 'Task URL Mapping') && formData.task && formData.id) {
+                try {
+                    const response = await api.get('task-urls');
+                    const allMappings = response.results || response;
+                    const relatedMappings = allMappings.filter(m => String(m.task) === String(formData.task));
+                    setFormData(prev => ({
+                        ...prev,
+                        _bulk_items: relatedMappings
+                    }));
+                } catch (err) {
+                    console.error('Failed to reload task URL mappings:', err);
+                }
+            }
+        };
+        loadTaskUrlMappings();
+    }, [modalType, formData.id, formData.task]);
+
+
+
+
+
+    // Global Hydration for Edit Mode
+    React.useEffect(() => {
+        // Hydrate Positions Filter (Job Structure & Office Context)
+        if (modalType === 'Positions' && formData.id && !formData._pos_hydrated && (offices?.length > 0)) {
+            const safeStr = (val) => (val === null || val === undefined) ? '' : String(val);
+
+            setFormData(prev => ({
+                ...prev,
+                _pos_hydrated: true,
+                _pos_level_filter: safeStr(prev.office_level_id || (prev.office?.level?.id) || prev.office_level),
+                office: safeStr(prev.office_id || (typeof prev.office === 'object' ? prev.office?.id : prev.office)),
+                _pos_office_filter: safeStr(prev.office_id || (typeof prev.office === 'object' ? prev.office?.id : prev.office)),
+                department: safeStr(prev.department_id || (typeof prev.department === 'object' ? prev.department?.id : prev.department)),
+                section: safeStr(prev.section_id || (typeof prev.section === 'object' ? prev.section?.id : prev.section)),
+                _pos_job_family_filter: safeStr(prev.job_family_id),
+                _pos_role_type_filter: safeStr(prev.role_type_id),
+                role: safeStr(prev.role_id || (typeof prev.role === 'object' ? prev.role?.id : prev.role)),
+                job: safeStr(prev.job_id || (typeof prev.job === 'object' ? prev.job?.id : prev.job))
+            }));
+        }
+
+        // Hydrate Employees - Identity & Status
+        if (modalType === 'Employees' && formData.id && !formData._emp_identity_hydrated) {
+            const today = new Date().toISOString().split('T')[0];
+            const p0 = (formData.positions_details && formData.positions_details.length > 0) ? formData.positions_details[0] : null;
+
+            setFormData(prev => ({
+                ...prev,
+                _emp_identity_hydrated: true,
+                pan_number: prev.pan_number || (prev.bank_details ? prev.bank_details.pan_number : ''),
+                aadhaar_number: prev.aadhaar_number || (prev.bank_details ? prev.bank_details.aadhaar_number : ''),
+                _inactivation_type: prev.status === 'Inactive' ? (prev.status_date === today ? 'Immediate' : 'Not Immediate') : '',
+                // Also hydrate assignment filters based on first current position
+                _emp_level_filter: prev._emp_level_filter || (p0 ? (p0.office_level_id || (p0.office_details?.level_id)) : ''),
+                _emp_office_filter: prev._emp_office_filter || (p0 ? (p0.office_id || p0.office) : ''),
+                _emp_dept_filter: prev._emp_dept_filter || (p0 ? (p0.department_id || p0.department) : ''),
+                _emp_section_filter: prev._emp_section_filter || (p0 ? (p0.section_id || p0.section) : '')
+            }));
+        }
+
+        // Hydrate Departments Filter
+        if (modalType === 'Departments' && formData.id && formData.office && !formData._dept_hydrated) {
+            const officeObj = (offices || []).find(o => o.id == formData.office);
+            if (officeObj) {
+                setFormData(prev => ({
+                    ...prev,
+                    _dept_hydrated: true,
+                    _dept_office_level_filter: officeObj.level || ''
+                }));
+            }
+        }
+
+        // Hydrate Sections Filter
+        if (modalType === 'Sections' && formData.id && formData.office && !formData._sec_hydrated) {
+            const officeObj = (offices || []).find(o => o.id == formData.office);
+            if (officeObj) {
+                setFormData(prev => ({
+                    ...prev,
+                    _sec_hydrated: true,
+                    _sec_office_level_filter: officeObj.level || ''
+                }));
+            }
+        }
+
+        // Hydrate Offices Filter (Parent Level)
+        // Hydrate Offices Filter (Parent Level)
+        if (modalType === 'Offices' && formData.id) {
+            let updates = {};
+            if (formData.parent && !formData._off_hydrated) {
+                const parentOffice = (offices || []).find(o => o.id == formData.parent);
+                if (parentOffice) {
+                    updates._off_hydrated = true;
+                    updates._parent_level_filter = parentOffice.level || '';
+                }
+            }
+
+            // Hydrate Facility Fields if they exist in the record but not in form state (for Edit)
+            if (formData.level) {
+                const lvl = (orgLevels || []).find(l => l.id == formData.level);
+                if (lvl && lvl.level_code === 'L9') {
+                    // Check if we need to set facility defaults based on existing data
+                    if (!formData.facility_type && (formData.camp_type || formData.mobile_type)) {
+                        if (formData.mobile_type) updates.facility_type = 'MOBILE';
+                        else if (formData.camp_type) updates.facility_type = 'CAMP';
+                    }
+                }
+            }
+
+            if (Object.keys(updates).length > 0) {
+                setFormData(prev => ({ ...prev, ...updates }));
+            }
+        }
+
+        // Hydrate Jobs Filter
+        if (modalType === 'Jobs' && formData.id && formData.role && !formData._jobs_hydrated) {
+            const roleObj = (roles || []).find(r => r.id == formData.role);
+            if (roleObj) {
+                const rtObj = (roleTypes || []).find(rt => rt.id == roleObj.role_type);
+                setFormData(prev => ({
+                    ...prev,
+                    _jobs_hydrated: true,
+                    role_type: roleObj.role_type || '',
+                    job_family: rtObj ? rtObj.job_family : ''
+                }));
+            }
+        }
+
+        // Hydrate Tasks Filter
+        if (modalType === 'Tasks' && formData.id && formData.job && !formData._tasks_hydrated) {
+            const jobObj = (jobs || []).find(j => j.id == formData.job);
+            if (jobObj) {
+                const roleObj = (roles || []).find(r => r.id == jobObj.role);
+                const rtObj = roleObj ? (roleTypes || []).find(rt => rt.id == roleObj.role_type) : null;
+                setFormData(prev => ({
+                    ...prev,
+                    _tasks_hydrated: true,
+                    role: jobObj.role || '',
+                    role_type: roleObj ? roleObj.role_type : '',
+                    job_family: rtObj ? rtObj.job_family : ''
+                }));
+            }
+        }
+
+        // Hydrate Geo Filters (Robust Chain Hydration)
+        // Fixed: Allow hydration for new records (!formData.id) if context seed (mandal, panchayat etc) is present
+        if (!formData._geo_hydrated && (formData.id || formData.mandal || formData.cluster || formData.district || formData.state || formData.country)) {
+            let updates = {};
+            let found = false;
+
+            if (modalType === 'States' && (formData.country || formData.continent_id)) {
+                if (formData.continent_id) { updates._territory_filter = formData.continent_id; found = true; }
+                else {
+                    const country = (geoCountries || []).find(c => c.id == formData.country);
+                    if (country) { updates._territory_filter = country.continent_ref || ''; found = true; }
+                }
+            } else if (modalType === 'Districts' && (formData.state || formData.country_id)) {
+                if (formData.country_id) {
+                    updates._country_filter = formData.country_id || '';
+                    updates._territory_filter = formData.continent_id || '';
+                    found = true;
+                } else {
+                    const state = (geoStatesData || []).find(s => s.id == formData.state);
+                    const country = state ? (geoCountries || []).find(c => c.id == state.country) : null;
+                    if (state) { updates._country_filter = state.country || ''; updates._territory_filter = country ? country.continent_ref : ''; found = true; }
+                }
+            } else if (modalType === 'Mandals' && (formData.district || formData.state_id)) {
+                if (formData.state_id) {
+                    updates._state_filter = formData.state_id || '';
+                    updates._country_filter = formData.country_id || '';
+                    updates._territory_filter = formData.continent_id || '';
+                    found = true;
+                } else {
+                    const district = (geoDistrictsData || []).find(d => d.id == formData.district);
+                    const state = district ? (geoStatesData || []).find(s => s.id == district.state) : null;
+                    const country = state ? (geoCountries || []).find(c => c.id == state.country) : null;
+                    if (district) {
+                        updates._state_filter = district.state || '';
+                        updates._country_filter = state ? state.country : '';
+                        updates._territory_filter = country ? country.continent_ref : '';
+                        found = true;
+                    }
+                }
+            } else if (modalType === 'Clusters' && (formData.mandal || formData.district_id)) {
+                let updates = {};
+                let fullyHydrated = false;
+
+                if (formData.district_id) {
+                    updates._district_filter = String(formData.district_id || '');
+                    updates._state_filter = String(formData.state_id || '');
+                    updates._country_filter = String(formData.country_id || '');
+                    updates._territory_filter = String(formData.continent_id || '');
+                    fullyHydrated = !!formData.continent_id;
+                } else {
+                    const mandal = (geoMandals || []).find(m => m.id == formData.mandal);
+                    const district = mandal ? (geoDistrictsData || []).find(d => d.id == mandal.district) : null;
+                    const state = district ? (geoStatesData || []).find(s => s.id == district.state) : null;
+                    const country = state ? (geoCountries || []).find(c => c.id == state.country) : null;
+
+                    if (mandal) {
+                        updates._district_filter = String(mandal.district || '');
+                        if (district) updates._state_filter = String(district.state || '');
+                        if (state) updates._country_filter = String(state.country || '');
+                        if (country) {
+                            updates._territory_filter = String(country.continent_ref || '');
+                            fullyHydrated = true;
+                        }
+                    }
+                }
+
+                if (Object.keys(updates).length > 0) {
+                    setFormData(prev => ({ ...prev, ...updates, _geo_hydrated: (fullyHydrated || prev._geo_hydrated) }));
+                }
+            }
+
+            if (found) {
+                updates._geo_hydrated = true;
+                setFormData(prev => ({ ...prev, ...updates }));
+            }
+        }
+
+        // Hydrate Visiting Locations & Landmarks - Resolve Geo Chain for Filters
+        if ((modalType === 'Visiting Locations' || modalType === 'Hotspots' || modalType === 'Landmarks') && formData.id && !formData._visiting_geo_hydrated) {
+            const mandalId = formData.mandal_id || (formData.cluster_details?.mandal_id);
+            const districtId = formData.district_id || (formData.cluster_details?.district_id);
+            const stateId = formData.state_id || (formData.cluster_details?.state_id);
+            const countryId = formData.country_id || (formData.cluster_details?.country_id);
+            const continentId = formData.continent_id || (formData.cluster_details?.continent_id);
+
+            let updates = {};
+            let fullyHydrated = false;
+
+            if (mandalId) updates._mandal_filter = String(mandalId);
+            if (districtId) updates._district_filter = String(districtId);
+            if (stateId) updates._state_filter = String(stateId);
+
+            // Try to use direct IDs from record first
+            if (countryId) updates._country_filter = String(countryId);
+            if (continentId) {
+                updates._territory_filter = String(continentId);
+                fullyHydrated = true;
+            }
+
+            // Fallback for missing territory/country in older records format
+            if (!fullyHydrated && stateId) {
+                const stateObj = (geoStatesData || []).find(s => s.id == stateId);
+                if (stateObj) {
+                    updates._country_filter = String(stateObj.country || '');
+                    const countryObj = (geoCountries || []).find(c => c.id == stateObj.country);
+                    if (countryObj) {
+                        updates._territory_filter = String(countryObj.continent_ref || '');
+                        fullyHydrated = true;
+                    }
+                }
+            }
+
+            if (Object.keys(updates).length > 0) {
+                setFormData(prev => ({
+                    ...prev,
+                    ...updates,
+                    _visiting_geo_hydrated: (fullyHydrated || prev._visiting_geo_hydrated)
+                }));
+            }
+        }
+
+        // Hydrate Projects Geo Scope Filters
+        if (modalType === 'Projects' && formData.id && formData.geo_scope_level && !formData._proj_geo_hydrated) {
+            setFormData(prev => ({ ...prev, _proj_geo_hydrated: true }));
+        }
+
+        // Trigger Geo Chain Fetches for Edit Mode (Offices, Projects, etc.)
+        if (formData.id && !formData._geo_chain_fetched) {
+            const hasState = !!formData.state_name;
+            const hasDistrict = !!formData.district_name;
+            const hasMandal = !!formData.mandal_name;
+
+            // Geo Chain Check removed due to reference errors and performance considerations
+
+
+            setFormData(prev => ({ ...prev, _geo_chain_fetched: true }));
+        }
+
+        // Hydrate Employment History (Auto-populate Position/Dept from current employee data)
+        if (modalType === 'Employment History' && !formData.id) {
+            const empId = formData.employee || (selectedEmployee ? selectedEmployee.id : null);
+            if (empId && !formData._emp_hist_hydrated) {
+                const emp = (allEmployees || []).find(e => e.id == empId) || selectedEmployee;
+                if (emp) {
+                    const latestPos = (emp.positions_details || [])[0];
+                    setFormData(prev => ({
+                        ...prev,
+                        _emp_hist_hydrated: true,
+                        employee: empId,
+                        position_name: prev.position_name || (latestPos ? latestPos.name : ''),
+                        department_name: prev.department_name || (latestPos ? latestPos.department_name : ''),
+                        reporting_to_name: prev.reporting_to_name || emp.reporting_to_name || '',
+                        date_of_join: prev.date_of_join || emp.hire_date || emp.employment_start_date || '',
+                        employee_type: prev.employee_type || emp.employment_type || 'Permanent',
+                        status: prev.status || emp.status || 'Active'
+                    }));
+                }
+            }
+        }
+    }, [modalType, formData.id, formData.employee, formData._emp_hist_hydrated, formData.office, formData.parent, formData.role, formData.job, formData.country, formData.state, formData.district, formData.mandal, formData.cluster, selectedEmployee, allEmployees, offices, roles, roleTypes, jobs, geoContinents, geoCountries, geoStatesData, geoDistrictsData, geoMandals]);
+
+
+
+    // Ensure we trigger the switch normally below
+
+    // Helper for Employee Config Grid - Robust Filtering
+    const getFilteredPositions = () => {
+        if (!positions) return [];
+
+        // Start with filtered positions from global list
+        const filtered = (positions || []).filter(p => {
+            if (!p) return false;
+
+            // Always include currently assigned positions (for edit mode)
+            const assignedPositionIds = (formData.positions || []).map(id => Number(id));
+            if (assignedPositionIds.includes(Number(p.id))) {
+                return true;
+            }
+
+            const levelFilterId = formData._emp_level_filter ? String(formData._emp_level_filter) : null;
+            const sectionFilterId = formData._emp_section_filter ? String(formData._emp_section_filter) : null;
+            const deptFilterId = formData._emp_dept_filter ? String(formData._emp_dept_filter) : null;
+            const officeFilterId = formData._emp_office_filter ? String(formData._emp_office_filter) : null;
+
+            // 1. Strict Section Filter
+            if (sectionFilterId) {
+                const sid = p.section_id || p.section;
+                if (String(sid) !== String(sectionFilterId)) return false;
+            }
+
+            // 2. Strict Department Filter
+            if (deptFilterId) {
+                const did = p.department_id || p.department;
+                if (String(did) !== String(deptFilterId)) return false;
+            }
+
+            // 3. Office Filter
+            if (officeFilterId) {
+                const pid = p.office_id || p.office;
+                const did = p.department_id || p.department;
+
+                const matchOffice = String(pid) === String(officeFilterId);
+                const dept = (departments || []).find(d => d && String(d.id) === String(did));
+                const matchViaDept = dept && String(dept.office || dept.office_id) === String(officeFilterId);
+
+                if (!matchOffice && !matchViaDept) return false;
+            }
+
+            // 4. Level Filter
+            if (levelFilterId) {
+                const pid = p.office_id || p.office;
+                const office = (offices || []).find(o => o && String(o.id) === String(pid));
+                const oLevel = office ? (office.level_id || (office.level && (typeof office.level === 'object' ? office.level.id : office.level))) : (p.office_level_id || (p.office_details?.level_id));
+
+                if (String(oLevel) !== String(levelFilterId)) return false;
+            }
+
+            return true;
+        });
+
+        // Add assigned positions from positions_details that aren't in the global positions list
+        if (formData.positions_details && formData.positions_details.length > 0) {
+            const filteredIds = filtered.map(p => Number(p.id));
+            const assignedPositionIds = (formData.positions || []).map(id => Number(id));
+
+            formData.positions_details.forEach(assignedPos => {
+                // If this assigned position isn't in the filtered list and is in formData.positions
+                if (!filteredIds.includes(Number(assignedPos.id)) && assignedPositionIds.includes(Number(assignedPos.id))) {
+                    console.log(`✅ Adding assigned position not in global list: ${assignedPos.name} (ID: ${assignedPos.id})`);
+                    filtered.push(assignedPos);
+                }
+            });
+        }
+
+        return filtered;
+    };
+
+    // Helper for Position Reporting - Include assigned reporting positions
+    const getFilteredReportingPositions = () => {
+        if (!positions) return [];
+
+        // Start with filtered positions
+        let filtered = positions
+            .filter(p => !formData.id || p.id != formData.id) // Exclude self
+            .filter(p => !formData._rep_level_filter || p.office_level_id == formData._rep_level_filter)
+            .filter(p => !formData._rep_office_filter || p.office == formData._rep_office_filter)
+            .filter(p => !formData._rep_pos_level_filter || p.level == formData._rep_pos_level_filter);
+
+        // Add currently assigned reporting positions that aren't in the filtered list
+        if (formData.reporting_to_details && formData.reporting_to_details.length > 0) {
+            const filteredIds = filtered.map(p => Number(p.id));
+            const assignedReportingIds = (formData.reporting_to || []).map(id => Number(id));
+
+            formData.reporting_to_details.forEach(assignedPos => {
+                // If this assigned reporting position isn't in the filtered list
+                if (!filteredIds.includes(Number(assignedPos.id)) && assignedReportingIds.includes(Number(assignedPos.id))) {
+                    console.log(`✅ Adding assigned reporting position not in list: ${assignedPos.name} (ID: ${assignedPos.id})`);
+                    filtered.push(assignedPos);
+                }
+            });
+        }
+
+        return filtered;
+    };
+
+    // Consolidated Master Auto-Generation & Auto-Population
+    React.useEffect(() => {
+        if (!modalType) return;
+
+        const updates = {};
+        let shouldUpdate = false;
+
+        // 1. Facility Master Auto-population
+        if (modalType === 'Facility Master' || modalType === 'FacilityMaster') {
+            if (selectedProj && formData.project) {
+                const pType = selectedProj.project_type;
+
+                // 1. Auto-set project type based on Project's own type
+                if (pType && formData.project_type !== pType) {
+                    updates.project_type = pType;
+                    shouldUpdate = true;
+                }
+
+                // Build location name from geo hierarchy
+                const locationParts = [
+                    selectedProj.cluster_name,
+                    selectedProj.mandal_name,
+                    selectedProj.district_name,
+                    selectedProj.state_name,
+                    selectedProj.country_name,
+                    selectedProj.continent_name
+                ].filter(Boolean);
+
+                if (locationParts.length > 0) {
+                    const nextLoc = locationParts.join(', ');
+                    if (formData.location_code !== nextLoc) {
+                        updates.location_code = nextLoc;
+                        shouldUpdate = true;
+                    }
+                }
+            }
+        }
+        // 2. Job Families Code Generation
+        else if ((modalType === 'Job Families' || modalType === 'JobFamilies') && !formData.id && !formData.code) {
+            const nextCode = generateNextCode('JF', jobFamilies);
+            updates.code = nextCode;
+            shouldUpdate = true;
+        }
+        // 3. Role Types Code Generation
+        else if ((modalType === 'Role Types' || modalType === 'RoleTypes') && !formData.id && !formData.code && formData.job_family) {
+            const jf = (jobFamilies || []).find(f => f.id == formData.job_family);
+            if (jf && jf.prefix) {
+                const nextCode = generateNextCode(jf.prefix, roleTypes, 'job_family', formData.job_family);
+                updates.code = nextCode;
+                shouldUpdate = true;
+            }
+        }
+        // 4. Roles Code Generation
+        else if (modalType === 'Roles' && !formData.id && !formData.code && formData.role_type) {
+            const rt = (roleTypes || []).find(t => t.id == formData.role_type);
+            if (rt && rt.code) {
+                const nextCode = generateNextCode(rt.code, roles, 'role_type', formData.role_type);
+                updates.code = nextCode;
+                shouldUpdate = true;
+            }
+        }
+        // 5. Jobs Code Generation
+        else if ((modalType === 'Jobs ' || modalType === 'Jobs') && !formData.id && !formData.code && formData.role) {
+            const r = (roles || []).find(role => role.id == formData.role);
+            if (r && r.code) {
+                const nextCode = generateNextCode(r.code, jobs, 'role', formData.role);
+                updates.code = nextCode;
+                shouldUpdate = true;
+            }
+        }
+
+        if (shouldUpdate) {
+            setFormData(prev => ({ ...prev, ...updates }));
+        }
+    }, [modalType, formData.id, formData.project, selectedProj, formData.job_family, formData.role_type, formData.role, jobFamilies, roleTypes, roles, jobs]);
+
+    switch (modalType) {
+        case 'User Management':
+            return (
+                <div className="form-grid">
+                    <div className="form-section-title"><User size={16} /> User Account Details</div>
+                    <div className="form-group full-width">
+                        <label className="premium-label"><Users size={14} /> Link to Employee Profile (Optional)</label>
+                        <div className="premium-input-wrapper">
+                            <SearchableSelect
+                                options={allEmployees?.map(emp => ({ id: emp.id, name: `${emp.name} (${emp.employee_code})` })) || []}
+                                value={formData.employee_id || ''}
+                                onChange={(e) => {
+                                    const empId = e.target.value;
+                                    const emp = (allEmployees || []).find(ep => ep && ep.id == empId);
+                                    setFormData({
+                                        ...formData,
+                                        employee_id: empId,
+                                        first_name: emp ? emp.name.split(' ')[0] : formData.first_name,
+                                        last_name: emp ? (emp.name.split(' ').slice(1).join(' ') || '') : formData.last_name,
+                                        email: emp ? emp.email : formData.email
+                                    });
+                                }}
+                                placeholder="Search for employee to auto-fill..."
+                                icon={Users}
+                            />
+                        </div>
+                    </div>
+                    <div className="form-group full-width">
+                        <label>Username</label>
+                        <input type="text" className="form-input" value={formData.username || ''} onChange={(e) => setFormData({ ...formData, username: e.target.value })} required />
+                    </div>
+                    <div className="form-group full-width">
+                        <label>Password</label>
+                        <input type="password" className="form-input" value={formData.password || ''} onChange={(e) => setFormData({ ...formData, password: e.target.value })} required={!formData.id} placeholder={formData.id ? "Leave blank to keep unchanged" : ""} />
+                    </div>
+                    <div className="form-group full-width">
+                        <label>Email Address</label>
+                        <input type="email" className="form-input" value={formData.email || ''} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
+                    </div>
+
+                    <div className="form-section-title"><UserSquare2 size={16} /> Personal Info</div>
+                    <div className="form-group">
+                        <label>First Name</label>
+                        <input type="text" className="form-input" value={formData.first_name || ''} onChange={(e) => setFormData({ ...formData, first_name: validateAlpha(e.target.value) })} />
+                    </div>
+                    <div className="form-group">
+                        <label>Last Name</label>
+                        <input type="text" className="form-input" value={formData.last_name || ''} onChange={(e) => setFormData({ ...formData, last_name: validateAlpha(e.target.value) })} />
+                    </div>
+
+                    <div className="form-section-title"><ShieldCheck size={16} /> Permissions</div>
+                    <div className="form-group full-width" style={{ display: 'flex', gap: '2rem', marginTop: '0.5rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                            <input type="checkbox" checked={formData.is_staff || false} onChange={(e) => setFormData({ ...formData, is_staff: e.target.checked })} />
+                            Staff (Admin Access)
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                            <input type="checkbox" checked={formData.is_superuser || false} onChange={(e) => setFormData({ ...formData, is_superuser: e.target.checked })} />
+                            Superuser (Full Control)
+                        </label>
+                    </div>
+                </div>
+            );
+
+        case 'Levels':
+            const selectedParent = (orgLevels || []).find(l => l && l.id == formData.parent);
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}>
+                            <Layers size={18} /> Hierarchy Architecture
+                        </div>
+                        <div className="form-grid">
+                            <div className="form-group">
+                                <label className="premium-label"><Edit size={14} /> Level Name</label>
+                                <div className="premium-input-wrapper">
+                                    <Edit className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="Enter Level Name" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateAlphaNumeric(e.target.value) })} required />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><FileDigit size={14} /> Level Code (Manual)</label>
+                                <div className="premium-input-wrapper">
+                                    <FileDigit className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="Enter Level Code" value={formData.level_code || ''} onChange={(e) => setFormData({ ...formData, level_code: validateCode(e.target.value, 16, 'level_code') })} required />
+                                </div>
+                                {validationErrors.level_code && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <X size={12} /> {validationErrors.level_code}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Building2 size={14} /> Structural Placement / Parent Level</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={(orgLevels || []).map(level => {
+                                            const depth = (level.rank.toString().split('.').length - 1);
+                                            return {
+                                                id: level.id,
+                                                name: `${"\u00A0\u00A0".repeat(depth * 2)} Child of: ${level.level_code ? `${level.level_code} - ` : `Level ${parseFloat(level.rank)} - `}${level.name}`
+                                            };
+                                        })}
+                                        value={formData.parent || ''}
+                                        onChange={(e) => {
+                                            const parentId = e.target.value;
+                                            const parent = (orgLevels || []).find(l => l.id == parentId);
+                                            let suggestedRank = formData.rank;
+
+                                            if (parent) {
+                                                const children = (orgLevels || []).filter(l => l.parent == parentId);
+                                                if (children.length > 0) {
+                                                    const maxChildRank = Math.max(...children.map(c => parseFloat(c.rank)));
+                                                    suggestedRank = (maxChildRank + 0.01).toFixed(2);
+                                                } else {
+                                                    suggestedRank = (parseFloat(parent.rank) + 0.10).toFixed(2);
+                                                }
+                                            } else if (!parentId) {
+                                                const primaries = (orgLevels || []).filter(l => !l.parent);
+                                                const maxPrimaryRank = primaries.length > 0 ? Math.max(...primaries.map(p => parseFloat(p.rank))) : 0;
+                                                suggestedRank = (Math.floor(maxPrimaryRank) + 1).toFixed(2);
+                                            }
+
+                                            setFormData({ ...formData, parent: parentId || null, rank: suggestedRank });
+                                        }}
+                                        placeholder="Select Parent (Optional for Top Level)..."
+                                        icon={Building2}
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><TrendingUp size={14} /> Level Number / Rank (Manual)</label>
+                                <div className="premium-input-wrapper">
+                                    <TrendingUp className="premium-input-icon" size={18} />
+                                    <input type="number" step="0.01" className="premium-input" placeholder="Enter Rank (1.0, 2.1, etc.)" value={formData.rank || ''} onChange={(e) => setFormData({ ...formData, rank: e.target.value || null })} required />
+                                </div>
+                                <span className="form-help-text">Used for vertical ordering. Lower is higher in hierarchy.</span>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Calendar size={14} /> Start Date <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Calendar className="premium-input-icon" size={18} />
+                                    <input type="date" className="premium-input" value={formData.start_date || ''} onChange={(e) => setFormData({ ...formData, start_date: e.target.value })} required max="2099-12-31" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}>
+                            <FileText size={18} /> Details
+                        </div>
+                        <div className="form-group full-width">
+                            <label className="premium-label"><FileText size={14} /> Description & Guidelines</label>
+                            <div className="premium-input-wrapper" style={{ height: 'auto' }}>
+                                <FileText className="premium-input-icon" size={18} style={{ marginTop: '0.75rem' }} />
+                                <textarea
+                                    className="premium-input"
+                                    style={{ padding: '0.75rem 0.75rem 0.75rem 2.5rem', minHeight: '100px', resize: 'vertical' }}
+                                    rows="3"
+                                    placeholder="Describe the operational scope..."
+                                    value={formData.description || ''}
+                                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+        case 'Position Levels':
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}>
+                            <Layers size={18} /> Position Level Architecture
+                        </div>
+                        <div className="form-grid">
+                            <div className="form-group">
+                                <label className="premium-label"><Edit size={14} /> Level Name</label>
+                                <div className="premium-input-wrapper">
+                                    <Edit className="premium-input-icon" size={18} />
+                                    <input
+                                        type="text"
+                                        className="premium-input"
+                                        placeholder="Enter Level Name (e.g. Senior Manager)"
+                                        value={formData.name || ''}
+                                        onChange={(e) => setFormData({ ...formData, name: validateAlphaNumeric(e.target.value) })}
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><TrendingUp size={14} /> Rank / Seniority Index</label>
+                                <div className="premium-input-wrapper">
+                                    <TrendingUp className="premium-input-icon" size={18} />
+                                    <input
+                                        type="number"
+                                        className="premium-input"
+                                        placeholder="Enter Rank (1, 2, 3...)"
+                                        value={formData.rank || ''}
+                                        onChange={(e) => setFormData({ ...formData, rank: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <span className="form-help-text">Numerical hierarchy. Lower numbers (like 1) typically indicate the highest seniority.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}>
+                            <FileText size={18} /> Scope & Responsibilities
+                        </div>
+                        <div className="form-group full-width">
+                            <label className="premium-label"><FileText size={14} /> Description</label>
+                            <div className="premium-input-wrapper" style={{ height: 'auto' }}>
+                                <FileText className="premium-input-icon" size={18} style={{ marginTop: '0.75rem' }} />
+                                <textarea
+                                    className="premium-input"
+                                    style={{ padding: '0.75rem 0.75rem 0.75rem 2.5rem', minHeight: '100px', resize: 'vertical' }}
+                                    rows="3"
+                                    placeholder="Describe the typical scope and authority level for this rank..."
+                                    value={formData.description || ''}
+                                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+        case 'Offices':
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+
+                    {/* Primary Identity Section */}
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><Building2 size={18} /> Structural Identity & Contact</div>
+
+                        <div className="form-grid">
+                            <div className="form-group">
+                                <label className="premium-label"><Layers size={14} /> Structural Tier <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={orgLevels?.map(level => ({
+                                            id: String(level.id),
+                                            name: level.level_code ? `${level.level_code} - ${level.name}` : level.name
+                                        })) || []}
+                                        value={formData.level || ''}
+                                        onChange={(e) => {
+                                            const lvlId = e.target.value;
+                                            setFormData({
+                                                ...formData,
+                                                level: lvlId,
+                                                code: '', // Reset code to let useEffect re-generate
+                                                cluster: '',
+                                                location: ''
+                                            });
+                                        }}
+                                        placeholder="Select Level..."
+                                        icon={Layers}
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Facility Configuration (Start of L9 specifics) */}
+                            {currentLevel?.level_code === 'L9' && (
+                                <>
+                                    <div className="form-group full-width" style={{ marginBottom: '2rem', gridColumn: '1 / -1' }}>
+                                        <label className="premium-label"><Map size={14} /> Facility Template Architecture <span style={{ color: 'var(--primary)' }}>*</span></label>
+                                        <div className="premium-input-wrapper" style={{ border: '2px solid var(--primary)' }}>
+                                            <SearchableSelect
+                                                options={facilityMasters?.map(m => ({
+                                                    id: String(m.id),
+                                                    name: `${m.name} (${m.project_name})`
+                                                })) || []}
+                                                value={formData.facility_master || ''}
+                                                onChange={(e) => {
+                                                    const masterId = e.target.value;
+                                                    const master = facilityMasters.find(m => String(m.id) === String(masterId));
+                                                    setFormData({
+                                                        ...formData,
+                                                        facility_master: masterId,
+                                                        name: formData.name || master?.name || '',
+                                                        facility_type: master?.mode === 'MOBILE' ? 'MOBILE' : (master?.life === 'TEMPORARY' ? 'CAMP' : 'PERMANENT'),
+                                                        code: master?.project_code || formData.code || ''
+                                                    });
+                                                }}
+                                                placeholder="Select Template..."
+                                                icon={FolderKanban}
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {formData.facility_master ? (
+                                        <div className="form-group full-width" style={{
+                                            background: 'var(--primary-light)',
+                                            padding: '1.5rem',
+                                            borderRadius: '24px',
+                                            border: '1px solid var(--primary)',
+                                            display: 'grid',
+                                            gridTemplateColumns: 'repeat(3, 1fr)',
+                                            gap: '1.25rem',
+                                            marginBottom: '2rem',
+                                            boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
+                                            gridColumn: '1 / -1'
+                                        }}>
+                                            {(() => {
+                                                const master = facilityMasters.find(m => m.id == formData.facility_master);
+                                                return master ? (
+                                                    <>
+                                                        <div style={{ gridColumn: '1/-1', borderBottom: '1px solid rgba(var(--primary-rgb), 0.2)', paddingBottom: '0.75rem', marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary-dark)', fontWeight: 800 }}>
+                                                            <LayoutGrid size={16} /> Technical Specification Overview
+                                                        </div>
+                                                        <div>
+                                                            <label style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Anchor Project</label>
+                                                            <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--primary)' }}>{master.project_name}</div>
+                                                        </div>
+                                                        <div>
+                                                            <label style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Longevity</label>
+                                                            <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1e293b' }}>{master.life_display}</div>
+                                                        </div>
+                                                        <div>
+                                                            <label style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Service Mode</label>
+                                                            <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1e293b' }}>{master.mode_display || master.mode}</div>
+                                                        </div>
+                                                        <div>
+                                                            <label style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Geo Scope</label>
+                                                            <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1e293b' }}>{master.project_type_display || 'Standard'}</div>
+                                                        </div>
+                                                        <div style={{ gridColumn: 'span 2' }}>
+                                                            <label style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.05em' }}>Jurisdiction Code(s)</label>
+                                                            <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1e293b' }}>{master.location_code}</div>
+                                                        </div>
+                                                    </>
+                                                ) : null;
+                                            })()}
+                                        </div>
+                                    ) : (
+                                        <div className="form-group full-width" style={{ marginBottom: '2rem', gridColumn: '1 / -1' }}>
+                                            <div style={{ padding: '1.25rem', background: '#fef3c7', border: '1px dashed #f59e0b', borderRadius: '16px', color: '#92400e', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '12px', fontWeight: 600 }}>
+                                                <GraduationCap size={20} /> Select a template to auto-populate facility technical parameters.
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {(formData.facility_type === 'CAMP' || formData.facility_type === 'MOBILE') && (
+                                        <div className="form-group fade-in">
+                                            <label className="premium-label"><Calendar size={14} /> Estimated Retirement Date</label>
+                                            <div className="premium-input-wrapper">
+                                                <Calendar className="premium-input-icon" size={18} />
+                                                <input type="date" className="premium-input" value={formData.end_date || ''} onChange={(e) => setFormData({ ...formData, end_date: e.target.value })} required />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {selectedMaster?.mode === 'MOBILE' && (
+                                        <div className="form-group full-width fade-in" style={{ gridColumn: '1 / -1' }}>
+                                            <label className="premium-label"><MapPin size={14} /> Base Location (Context)</label>
+                                            <div className="premium-input-wrapper">
+                                                <MapPin className="premium-input-icon" size={18} />
+                                                <input
+                                                    type="text"
+                                                    className="premium-input"
+                                                    placeholder="Enter operational base point"
+                                                    value={formData.location || ''}
+                                                    onChange={(e) => setFormData({ ...formData, location: capitalize(e.target.value) })}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {selectedMaster?.mode === 'FIXED' && (
+                                        <div className="form-grid" style={{ gridColumn: '1 / -1', marginTop: '1rem' }}>
+                                            {/* Geospatial Coordinates & Map */}
+                                            <div className="form-group full-width" style={{ gridColumn: '1 / -1' }}>
+                                                <label className="premium-label"><MapPin size={14} /> Facility Location Map</label>
+                                                <div style={{ marginBottom: '1rem', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
+                                                    <GeoMapPicker
+                                                        latitude={formData.latitude}
+                                                        longitude={formData.longitude}
+                                                        onLocationSelect={(lat, lng) => setFormData({ ...formData, latitude: lat, longitude: lng })}
+                                                        searchQuery={[
+                                                            formData.location, // This would be village/ward name
+                                                            formData.panchayat_ward, // This would be panchayat/municipality name
+                                                            formData.mandal_name,
+                                                            formData.district_name,
+                                                            formData.state_name,
+                                                            formData.country_name
+                                                        ].filter(Boolean).join(', ')}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="form-group">
+                                                <label className="premium-label"><Navigation2 size={14} /> Latitude Coordinate</label>
+                                                <div className="premium-input-wrapper">
+                                                    <Navigation2 className="premium-input-icon" size={18} />
+                                                    <input
+                                                        type="number"
+                                                        step="0.000000001"
+                                                        className="premium-input"
+                                                        placeholder="e.g. 17.385044"
+                                                        value={formData.latitude || ''}
+                                                        onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="form-group">
+                                                <label className="premium-label"><Navigation2 size={14} /> Longitude Coordinate</label>
+                                                <div className="premium-input-wrapper">
+                                                    <Navigation2 className="premium-input-icon" size={18} />
+                                                    <input
+                                                        type="number"
+                                                        step="0.000000001"
+                                                        className="premium-input"
+                                                        placeholder="e.g. 78.486671"
+                                                        value={formData.longitude || ''}
+                                                        onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+
+                            <div className="form-group">
+
+                                <label className="premium-label"><Network size={14} /> Unique Identification Code (Manual)</label>
+                                <div className="premium-input-wrapper">
+                                    <Network className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="Enter Unique Code" value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 16, 'office_code') })} required />
+                                </div>
+                                {validationErrors.office_code && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.7rem', marginTop: '4px', marginLeft: '3rem' }}>
+                                        ⚠ {validationErrors.office_code}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="form-group">
+                                <label className="premium-label">
+                                    <Edit size={14} /> {
+                                        currentLevel?.level_code === 'L2' ? 'Vertical Name' :
+                                            currentLevel?.name?.toLowerCase().includes('facility') ? 'Facility Name' :
+                                                'Office Name'
+                                    } <span style={{ color: '#ef4444' }}>*</span>
+                                </label>
+                                <div className="premium-input-wrapper">
+                                    <Building2 className="premium-input-icon" size={18} />
+                                    <input
+                                        type="text"
+                                        className="premium-input"
+                                        placeholder={`Enter ${currentLevel?.level_code === 'L2' ? 'Vertical' : currentLevel?.name?.toLowerCase().includes('facility') ? 'Facility' : 'Office'} Name`}
+                                        value={formData.name || ''}
+                                        onChange={(e) => setFormData({ ...formData, name: validateAlphaNumeric(e.target.value, 100, 'office_name') })}
+                                        required
+                                    />
+                                </div>
+                                {validationErrors.office_name && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.7rem', marginTop: '4px', marginLeft: '3rem' }}>
+                                        ⚠ {validationErrors.office_name}
+                                    </div>
+                                )}
+                            </div>
+
+                            {currentLevel?.level_code !== 'L2' && (
+                                <>
+                                    <div className="form-group">
+                                        <label className="premium-label"><Edit size={14} /> Registered Name {currentLevel?.level_code === 'L3' && <span style={{ color: '#ef4444' }}>*</span>}</label>
+                                        <div className="premium-input-wrapper">
+                                            <FileText className="premium-input-icon" size={18} />
+                                            <input type="text" className="premium-input" placeholder="Legal Registered Name" value={formData.registered_name || ''} onChange={(e) => setFormData({ ...formData, registered_name: validateAlphaNumeric(e.target.value, 100, 'registered_name') })} required={currentLevel?.level_code === 'L3'} />
+                                        </div>
+                                        {validationErrors.registered_name && (
+                                            <div style={{ color: '#ef4444', fontSize: '0.7rem', marginTop: '4px', marginLeft: '3rem' }}>
+                                                ⚠ {validationErrors.registered_name}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="premium-label"><FileDigit size={14} /> Register ID {currentLevel?.level_code === 'L3' && <span style={{ color: '#ef4444' }}>*</span>}</label>
+                                        <div className="premium-input-wrapper">
+                                            <FileDigit className="premium-input-icon" size={18} />
+                                            <input type="text" className="premium-input" placeholder="Official Registration ID" value={formData.register_id || ''} onChange={(e) => setFormData({ ...formData, register_id: e.target.value })} required={currentLevel?.level_code === 'L3'} />
+                                        </div>
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="premium-label"><Users size={14} /> DIN No / Directors {currentLevel?.level_code === 'L3' && <span style={{ color: '#ef4444' }}>*</span>}</label>
+                                        <div className="premium-input-wrapper">
+                                            <Users className="premium-input-icon" size={18} />
+                                            <input type="text" className="premium-input" placeholder={currentLevel?.level_code === 'L3' ? "Required for Head Office" : "Optional for this level"} value={formData.din_no || ''} onChange={(e) => setFormData({ ...formData, din_no: validateNumbers(e.target.value, 20, 'din_no') })} required={currentLevel?.level_code === 'L3'} />
+                                        </div>
+                                        {validationErrors.din_no && (
+                                            <div style={{ color: '#ef4444', fontSize: '0.7rem', marginTop: '4px', marginLeft: '3rem' }}>
+                                                ⚠ {validationErrors.din_no}
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            )}
+
+                            <div className="form-group">
+                                <label className="premium-label"><Phone size={14} /> Contact Number <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Phone className="premium-input-icon" size={18} />
+                                    <input type="tel" className="premium-input" placeholder="10-digit primary contact" value={formData.phone || ''} onChange={(e) => setFormData({ ...formData, phone: validatePhone(e.target.value, 'contact_number') })} required />
+                                </div>
+                                {validationErrors.contact_number && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.7rem', marginTop: '4px', marginLeft: '3rem' }}>
+                                        ⚠ {validationErrors.contact_number}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="form-group">
+                                <label className="premium-label"><Mail size={14} /> Official Email <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Mail className="premium-input-icon" size={18} />
+                                    <input type="email" className="premium-input" placeholder="corporate@organization.com" value={formData.email || ''} onChange={(e) => setFormData({ ...formData, email: validateEmail(e.target.value, 100, 'office_email') })} required />
+                                </div>
+                                {validationErrors.office_email && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.7rem', marginTop: '4px', marginLeft: '3rem' }}>
+                                        ⚠ {validationErrors.office_email}
+                                    </div>
+                                )}
+                            </div>
+
+                            {currentLevel?.level_code !== 'L2' && (
+                                <div className="form-group">
+                                    <label className="premium-label"><Calendar size={14} /> Operational Start Date <span style={{ color: '#ef4444' }}>*</span></label>
+                                    <div className="premium-input-wrapper">
+                                        <Calendar className="premium-input-icon" size={18} />
+                                        <input
+                                            type="date"
+                                            className="premium-input"
+                                            value={formData.start_date || ''}
+                                            onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                                            min={formData.parent ? (offices || []).find(o => String(o.id) === String(formData.parent))?.start_date : ''}
+                                            required
+                                            max="2099-12-31"
+                                        />
+                                    </div>
+                                    {formData.parent && (offices || []).find(o => String(o.id) === String(formData.parent))?.start_date && (
+                                        <span className="form-help-text" style={{ color: 'var(--primary)', fontWeight: 600 }}>
+                                            Must be on or after parent office start date: {(offices || []).find(o => String(o.id) === String(formData.parent))?.start_date}
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+
+                            {currentLevel?.level_code !== 'L2' && (
+                                <div className="form-group">
+                                    <label className="premium-label"><ShieldCheck size={14} /> Office Operational Status</label>
+                                    <div className="location-type-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
+                                        <div
+                                            className={`type-card ${(formData.status === 'Active' || !formData.status) ? 'active' : ''}`}
+                                            onClick={() => setFormData({ ...formData, status: 'Active', status_date: null })}
+                                        >
+                                            <div style={{ fontWeight: 800 }}>ACTIVE</div>
+                                            <div style={{ fontSize: '0.7rem', opacity: 0.7 }}>Fully Operational</div>
+                                        </div>
+                                        <div
+                                            className={`type-card ${formData.status === 'Inactive' ? 'active' : ''}`}
+                                            style={{ borderColor: formData.status === 'Inactive' ? '#ef4444' : '', color: formData.status === 'Inactive' ? '#ef4444' : '' }}
+                                            onClick={() => setFormData({ ...formData, status: 'Inactive' })}
+                                        >
+                                            <div style={{ fontWeight: 800 }}>INACTIVE</div>
+                                            <div style={{ fontSize: '0.7rem', opacity: 0.7 }}>Deactivated / Closed</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {formData.status === 'Inactive' && (
+                                <div className="form-group full-width fade-in">
+                                    <label className="premium-label" style={{ color: '#ef4444' }}><Calendar size={14} /> Inactivation Effective Date</label>
+                                    <div className="premium-input-wrapper" style={{ borderColor: '#ef4444' }}>
+                                        <Calendar className="premium-input-icon" size={18} style={{ color: '#ef4444' }} />
+                                        <input
+                                            type="date"
+                                            className="premium-input"
+                                            value={formData.status_date || ''}
+                                            onChange={(e) => setFormData({ ...formData, status_date: e.target.value })}
+                                            required
+                                        />
+                                    </div>
+                                    <span style={{ color: '#ef4444', fontSize: '0.7rem', marginTop: '4px', marginLeft: '3rem', display: 'block' }}>Specify the date from which this office is de-commissioned.</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+
+
+                    {/* Reporting & Alignment Section */}
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}>
+                            <Navigation size={18} /> Reporting Structure {(!['L1', 'L2'].includes(currentLevel?.level_code)) && '& Geography'}
+                        </div>
+
+                        <div className="form-grid">
+                            <div className="form-group">
+                                <label className="premium-label"><Layers size={14} /> Structural Level Filter</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={(orgLevels || [])
+                                            .filter(lvl => parseFloat(lvl.rank) < parseFloat(currentLevel?.rank || 999))
+                                            .filter(lvl => !lvl.name.toLowerCase().includes('facility'))
+                                            .sort((a, b) => a.rank - b.rank)
+                                            .map(lvl => ({ id: String(lvl.id), name: `${lvl.name} (${lvl.level_code})` }))}
+                                        value={formData._parent_level_filter || ''}
+                                        onChange={(e) => setFormData({ ...formData, _parent_level_filter: e.target.value, parent: null })}
+                                        placeholder="Filter ancestors..."
+                                        icon={Layers}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-group">
+                                <label className="premium-label"><Building2 size={14} /> Parent Office (Reporting Line)</label>
+                                <div className="premium-input-wrapper">
+                                    <Building2 className="premium-input-icon" size={18} />
+                                    <select className="premium-input" value={formData.parent || ''} onChange={(e) => {
+                                        const val = e.target.value;
+                                        const parentId = val ? parseInt(val) : null;
+                                        const parentOffice = offices.find(o => o.id === parentId);
+
+                                        if (parentOffice) {
+                                            setFormData({
+                                                ...formData,
+                                                parent: parentId,
+                                                country_name: parentOffice.country_name || 'INDIA',
+                                                state_name: parentOffice.state_name || '',
+                                                district_name: parentOffice.district_name || '',
+                                                mandal_name: parentOffice.mandal_name || '',
+                                                cluster: parentOffice.cluster || '',
+                                            });
+                                        } else {
+                                            setFormData({ ...formData, parent: null });
+                                        }
+                                    }}>
+                                        <option value="">None (Top Level Organization)</option>
+                                        {(() => {
+                                            const filteredOffices = offices.filter(office => {
+                                                const officeLevel = orgLevels.find(l => l.id == office.level);
+                                                if (!officeLevel) return false;
+
+                                                // 1. Must be a reporting level (not a facility)
+                                                if (officeLevel.name.toLowerCase().includes('facility')) return false;
+
+                                                // 2. Must be an ancestor level (lower rank number means higher in hierarchy)
+                                                if (currentLevel && parseFloat(officeLevel.rank) >= parseFloat(currentLevel.rank)) return false;
+
+                                                // 3. Apply the Parent Level Filter if selected
+                                                if (formData._parent_level_filter) return office.level == formData._parent_level_filter;
+
+                                                return true;
+                                            });
+                                            return filteredOffices.length > 0 ? filteredOffices.map(office => (<option key={office.id} value={office.id}>{office.name} ({office.level_display})</option>)) : <option disabled>No valid reporting offices found</option>;
+                                        })()}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {(!['L1', 'L2'].includes(currentLevel?.level_code)) && (
+                                <>
+                                    <div className="form-group">
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                                            <label className="premium-label" style={{ margin: 0 }}><Globe size={14} /> Country Scope</label>
+                                            <button type="button" className="sidebar-sub-link" style={{ padding: '2px 8px', background: 'var(--primary-light)', minWidth: 'auto', gap: '4px', fontSize: '0.7rem' }} onClick={() => handleAdd('Countries')}><Plus size={10} /> Add</button>
+                                        </div>
+                                        <div className="premium-input-wrapper">
+                                            <SearchableSelect
+                                                options={[{ id: 'INDIA', name: 'INDIA' }, ...(geoCountries?.filter(c => c.name && c.name.toUpperCase() !== 'INDIA').map(c => ({ id: c.name, name: c.name })) || [])]}
+                                                value={formData.country_name || 'INDIA'}
+                                                onChange={(e) => setFormData({ ...formData, country_name: e.target.value, state_name: '', district_name: '', mandal_name: '', location: '' })}
+                                                placeholder="Select Country..."
+                                                icon={Globe}
+                                                disabled={isFieldLocked('country_name')}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="form-group">
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                                            <label className="premium-label" style={{ margin: 0 }}><Navigation size={14} /> State Scope</label>
+                                            <button type="button" className="sidebar-sub-link" style={{ padding: '2px 8px', background: 'var(--primary-light)', minWidth: 'auto', gap: '4px', fontSize: '0.7rem' }} onClick={() => {
+                                                const selectedCountry = geoCountries.find(c => c.name.toUpperCase() === (formData.country_name || 'INDIA').toUpperCase());
+                                                handleAdd('States', { country_context: selectedCountry?.id });
+                                            }}><Plus size={10} /> Add</button>
+                                        </div>
+                                        <div className="premium-input-wrapper">
+                                            <SearchableSelect
+                                                options={(() => {
+                                                    const selectedCountryName = formData.country_name || 'INDIA';
+                                                    const selectedCountryId = (geoCountries || []).find(c => c && c.name.toLowerCase() === selectedCountryName.toLowerCase())?.id;
+                                                    return (geoStatesData || []).filter(s => s && s.country == selectedCountryId).map(s => ({ id: s.name, name: s.name }));
+                                                })()}
+                                                value={formData.state_name || ''}
+                                                onChange={(e) => setFormData({ ...formData, state_name: e.target.value, district_name: '', mandal_name: '', location: '' })}
+                                                placeholder="Select State..."
+                                                icon={Navigation}
+                                                required={!['L1', 'L2'].includes(currentLevel?.level_code)}
+                                                disabled={isFieldLocked('state_name')}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="form-group">
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                                            <label className="premium-label" style={{ margin: 0 }}><MapPin size={14} /> District Hierarchy</label>
+                                            <button type="button" className="sidebar-sub-link" style={{ padding: '2px 8px', background: 'var(--primary-light)', minWidth: 'auto', gap: '4px', fontSize: '0.7rem' }} onClick={() => {
+                                                const stateObj = geoStatesData.find(s => s.name === formData.state_name);
+                                                handleAdd('Districts', { state: stateObj?.id, state_name: formData.state_name });
+                                            }}><Plus size={10} /> Add</button>
+                                        </div>
+                                        <div className="premium-input-wrapper">
+                                            <SearchableSelect
+                                                options={(() => {
+                                                    const selectedStateName = formData.state_name;
+                                                    const selectedStateId = (geoStatesData || []).find(s => s && s.name.toLowerCase() === (selectedStateName || '').toLowerCase())?.id;
+                                                    return (geoDistrictsData || []).filter(d => d && d.state == selectedStateId).map(d => ({ id: d.name, name: d.name }));
+                                                })()}
+                                                value={formData.district_name || ''}
+                                                onChange={(e) => setFormData({ ...formData, district_name: e.target.value, mandal_name: '', location: '' })}
+                                                placeholder="Select District..."
+                                                icon={MapPin}
+                                                required={!['L1', 'L2'].includes(currentLevel?.level_code)}
+                                                disabled={!formData.state_name || isFieldLocked('district_name')}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="form-group">
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                                            <label className="premium-label" style={{ margin: 0 }}><Map size={14} /> Mandal / Administrative Hub</label>
+                                            <button type="button" className="sidebar-sub-link" style={{ padding: '2px 8px', background: 'var(--primary-light)', minWidth: 'auto', gap: '4px', fontSize: '0.7rem' }} onClick={() => handleAdd('Mandals', { temp_state: formData.state_name, district: formData.district_name })}><Plus size={10} /> Add</button>
+                                        </div>
+                                        <div className="premium-input-wrapper">
+                                            <SearchableSelect
+                                                options={(() => {
+                                                    const selectedDistrictName = formData.district_name;
+                                                    const stateObj = (geoStatesData || []).find(s => s && s.name.toLowerCase() === (formData.state_name || '').toLowerCase());
+                                                    const selectedDistrictId = (geoDistrictsData || []).find(d => d && d.name.toLowerCase() === (selectedDistrictName || '').toLowerCase() && d.state == stateObj?.id)?.id;
+                                                    return (geoMandals || []).filter(m => m && m.district == selectedDistrictId).map(m => ({ id: m.name, name: m.name }));
+                                                })()}
+                                                value={formData.mandal_name || ''}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setFormData({ ...formData, mandal_name: val, cluster: '', location: '' });
+                                                    if (val) checkGeoMandal(val, formData.district_name, formData.state_name);
+                                                }}
+                                                placeholder="Select Mandal..."
+                                                icon={Navigation}
+                                                required={!['L1', 'L2'].includes(currentLevel?.level_code)}
+                                                disabled={!formData.district_name || isFieldLocked('mandal_name')}
+                                            />
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Cluster Selection Section */}
+                    {formData.mandal_name && (!['L1', 'L2'].includes(currentLevel?.level_code)) && (
+                        <div className="premium-form-section">
+                            <div className="form-section-title" style={{ marginBottom: '2rem' }}><Layers size={18} /> Administrative Cluster</div>
+
+                            <div className="form-grid">
+                                <div className="form-group full-width">
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                                        <label className="premium-label" style={{ margin: 0 }}><Layers size={14} /> Cluster / Settlement</label>
+                                        <button type="button" className="sidebar-sub-link" style={{ padding: '2px 8px', background: 'var(--primary-light)', minWidth: 'auto', gap: '4px', fontSize: '0.7rem' }} onClick={() => handleAdd('Clusters', { mandal: (geoMandals || []).find(m => m.name === formData.mandal_name)?.id })}><Plus size={10} /> Add</button>
+                                    </div>
+                                    <div className="premium-input-wrapper">
+                                        <SearchableSelect
+                                            options={(() => {
+                                                const mandalId = (geoMandals || []).find(m => m.name === formData.mandal_name)?.id;
+                                                return (geoClusters || []).filter(c => c.mandal == mandalId).map(c => ({ id: c.id, name: `${c.name} (${c.cluster_type_display})` }));
+                                            })()}
+                                            value={formData.cluster || ''}
+                                            onChange={(e) => setFormData({ ...formData, cluster: e.target.value })}
+                                            placeholder="Select Administrative Cluster..."
+                                            icon={Layers}
+                                            required
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Final Physical Address Section */}
+                    {(!['L1', 'L2'].includes(currentLevel?.level_code)) && (
+                        <div className="premium-form-section">
+                            <div className="form-section-title" style={{ marginBottom: '2rem' }}><FileText size={18} /> Physical Establishment Address</div>
+                            <div className="form-group full-width">
+                                <label className="premium-label"><MapPin size={14} /> Full Mailing & Postal Address</label>
+                                <div className="premium-input-wrapper">
+                                    <MapPin className="premium-input-icon" size={18} style={{ top: '1.5rem', transform: 'none' }} />
+                                    <textarea
+                                        className="premium-input"
+                                        rows="3"
+                                        placeholder="House No, Street Name, Floor, Landmark, and PIN Code..."
+                                        value={formData.address || ''}
+                                        onChange={(e) => setFormData({ ...formData, address: validateAddress(e.target.value, 500, 'office_address') })}
+                                        style={{ paddingLeft: '3rem', paddingTop: '1rem' }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+
+        case 'Departments':
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><Briefcase size={18} /> Departmental Context</div>
+
+                        <div className="form-grid">
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Building2 size={14} /> Parent Office / Location</label>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 1fr) 2fr', gap: '1rem' }}>
+                                    <div className="premium-input-wrapper">
+                                        <Layers className="premium-input-icon" size={18} />
+                                        <select className="premium-input" style={{ borderColor: 'var(--primary-light)' }} value={formData._dept_office_level_filter || ''} onChange={(e) => setFormData({ ...formData, _dept_office_level_filter: e.target.value, office: '', project: '' })}>
+                                            <option value="">Filter by Level (Optional)</option>
+                                            {orgLevels?.length > 0 ? orgLevels.map(lvl => (<option key={lvl.id} value={lvl.id}>{lvl.name}</option>)) : <option disabled>No data found</option>}
+                                        </select>
+                                    </div>
+                                    <div className="premium-input-wrapper">
+                                        <SearchableSelect
+                                            options={(() => {
+                                                const filteredOffices = (offices || []).filter(o => {
+                                                    if (!formData._dept_office_level_filter) return true;
+                                                    const officeLevelId = o.level_id || (typeof o.level === 'object' ? o.level?.id : o.level);
+                                                    return String(officeLevelId) === String(formData._dept_office_level_filter);
+                                                });
+                                                return filteredOffices.map(o => ({ id: o.id, name: o.name }));
+                                            })()}
+                                            value={formData.office || ''}
+                                            onChange={(e) => {
+                                                const offId = e.target.value;
+                                                const off = offices.find(o => String(o.id) === String(offId));
+                                                const master = facilityMasters?.find(m => String(m.id) === String(off?.facility_master));
+                                                setFormData({
+                                                    ...formData,
+                                                    office: offId,
+                                                    project: master?.project || (off?.project_ids?.[0]) || formData.project || ''
+                                                });
+                                            }}
+                                            placeholder="Select Establishment..."
+                                            icon={Building2}
+                                            required
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="form-group full-width">
+                                <label className="premium-label"><FolderKanban size={14} /> Link to Project (Optional)</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={[
+                                            { id: '', name: 'None / Corporate (General Organization)' },
+                                            ...projects.filter(p => {
+                                                if (!formData.office) return true;
+                                                const off = offices.find(o => String(o.id) === String(formData.office));
+                                                const master = facilityMasters?.find(m => String(m.id) === String(off?.facility_master));
+                                                if (master?.project && String(p.id) === String(master.project)) return true;
+                                                // Check for Many-to-Many project assignments
+                                                if (off?.project_ids && off.project_ids.some(pid => String(pid) === String(p.id))) return true;
+                                                return false;
+                                            }).map(p => ({ id: p.id, name: p.name }))
+                                        ]}
+                                        value={formData.project || ''}
+                                        onChange={(e) => setFormData({ ...formData, project: e.target.value })}
+                                        placeholder="Select Project Scope..."
+                                        icon={FolderKanban}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><Edit size={18} /> Department Details</div>
+                        <div className="form-grid">
+                            <div className="form-group">
+                                <label className="premium-label"><Network size={14} /> Department Code (Manual)</label>
+                                <div className="premium-input-wrapper">
+                                    <Network className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="Enter Department Code" value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 16, 'dept_code') })} required />
+                                </div>
+                                {validationErrors.dept_code && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <X size={12} /> {validationErrors.dept_code}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Edit size={14} /> Department Name</label>
+                                <div className="premium-input-wrapper">
+                                    <Edit className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value, 100, 'dept_name') })} required />
+                                </div>
+                                {validationErrors.dept_name && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <X size={12} /> {validationErrors.dept_name}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Calendar size={14} /> Start Date <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Calendar className="premium-input-icon" size={18} />
+                                    <input
+                                        type="date"
+                                        className="premium-input"
+                                        value={formData.start_date || ''}
+                                        onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                                        min={formData.office ? (offices || []).find(o => String(o.id) === String(formData.office))?.start_date : ''}
+                                        required
+                                        max="2099-12-31"
+                                    />
+                                </div>
+                                {formData.office && (offices || []).find(o => String(o.id) === String(formData.office))?.start_date && (
+                                    <span className="form-help-text" style={{ color: 'var(--primary)', fontWeight: 600 }}>
+                                        Must be on or after parent office start date: {(offices || []).find(o => String(o.id) === String(formData.office))?.start_date}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><ShieldCheck size={18} /> Operational Status</div>
+                        <div className="form-grid">
+                            <div className="form-group full-width">
+                                <label className="premium-label"><ShieldCheck size={14} /> Department Status</label>
+                                <div className="location-type-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
+                                    <div
+                                        className={`type-card ${(formData.status === 'Active' || !formData.status) ? 'active' : ''}`}
+                                        onClick={() => setFormData({ ...formData, status: 'Active' })}
+                                    >
+                                        <div style={{ fontWeight: 800 }}>ACTIVE</div>
+                                        <div style={{ fontSize: '0.7rem', opacity: 0.7 }}>Fully Operational</div>
+                                    </div>
+                                    <div
+                                        className={`type-card ${formData.status === 'Inactive' ? 'active' : ''}`}
+                                        style={{ borderColor: formData.status === 'Inactive' ? '#ef4444' : '', color: formData.status === 'Inactive' ? '#ef4444' : '' }}
+                                        onClick={() => setFormData({ ...formData, status: 'Inactive' })}
+                                    >
+                                        <div style={{ fontWeight: 800 }}>INACTIVE</div>
+                                        <div style={{ fontSize: '0.7rem', opacity: 0.7 }}>Deactivated / Closed</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+        case 'Sections':
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><LayoutGrid size={18} /> Section Context</div>
+                        <div className="form-grid">
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Building2 size={14} /> Parent Office / Location</label>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 1fr) 2fr', gap: '1rem' }}>
+                                    <div className="premium-input-wrapper">
+                                        <SearchableSelect
+                                            options={(orgLevels || []).map(lvl => ({ id: lvl.id, name: lvl.name }))}
+                                            value={formData._sec_office_level_filter || ''}
+                                            onChange={(e) => setFormData({ ...formData, _sec_office_level_filter: e.target.value, office: '', department: '' })}
+                                            placeholder="Level Filter..."
+                                            icon={Layers}
+                                        />
+                                    </div>
+                                    <div className="premium-input-wrapper">
+                                        <SearchableSelect
+                                            options={(() => {
+                                                const filteredOffices = (offices || []).filter(o => {
+                                                    if (!formData._sec_office_level_filter) return true;
+                                                    const officeLevelId = o.level_id || (typeof o.level === 'object' ? o.level?.id : o.level);
+                                                    return String(officeLevelId) === String(formData._sec_office_level_filter);
+                                                });
+                                                return filteredOffices.map(o => ({ id: o.id, name: o.name }));
+                                            })()}
+                                            value={formData.office || ''}
+                                            onChange={(e) => setFormData({ ...formData, office: e.target.value, department: '' })}
+                                            placeholder="Select Establishment..."
+                                            icon={Building2}
+                                            required
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Briefcase size={14} /> Parent Department</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={departments.filter(d => d.office == formData.office).map(d => ({ id: d.id, name: d.name }))}
+                                        value={formData.department || ''}
+                                        onChange={(e) => {
+                                            const dept = departments.find(d => d.id == e.target.value);
+                                            setFormData({
+                                                ...formData,
+                                                department: e.target.value,
+                                                project: dept?.project || null
+                                            });
+                                        }}
+                                        placeholder="Select Department..."
+                                        icon={Briefcase}
+                                        required
+                                        disabled={!formData.office}
+                                    />
+                                </div>
+                                <span className="form-help-text">Section will inherit Project association from the selected Department.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><Edit size={18} /> Section Details</div>
+                        <div className="form-grid">
+                            <div className="form-group">
+                                <label className="premium-label"><Network size={14} /> Section Code (Manual)</label>
+                                <div className="premium-input-wrapper">
+                                    <Network className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="Enter Section Code" value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 16, 'sec_code') })} required />
+                                </div>
+                                {validationErrors.sec_code && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <X size={12} /> {validationErrors.sec_code}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Edit size={14} /> Section Name</label>
+                                <div className="premium-input-wrapper">
+                                    <Edit className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value, 100, 'sec_name') })} required />
+                                </div>
+                                {validationErrors.sec_name && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <X size={12} /> {validationErrors.sec_name}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Calendar size={14} /> Start Date <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Calendar className="premium-input-icon" size={18} />
+                                    <input
+                                        type="date"
+                                        className="premium-input"
+                                        value={formData.start_date || ''}
+                                        onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                                        min={formData.department ? (departments || []).find(d => String(d.id) === String(formData.department))?.start_date : ''}
+                                        required
+                                        max="2099-12-31"
+                                    />
+                                </div>
+                                {formData.department && (departments || []).find(d => String(d.id) === String(formData.department))?.start_date && (
+                                    <span className="form-help-text" style={{ color: 'var(--primary)', fontWeight: 600 }}>
+                                        Must be on or after parent department start date: {(departments || []).find(d => String(d.id) === String(formData.department))?.start_date}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+        case 'Facility Master':
+        case 'FacilityMaster':
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><Map size={18} /> Facility Master Configuration</div>
+
+                        <div className="form-grid">
+                            <div className="form-group full-width">
+                                <label className="premium-label"><FolderKanban size={14} /> Project Attachment <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={projects?.map(p => ({ id: p.id, name: p.name })) || []}
+                                        value={formData.project || ''}
+                                        onChange={(e) => setFormData({ ...formData, project: e.target.value })}
+                                        placeholder="Select parent project..."
+                                        icon={FolderKanban}
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            {selectedProj && (
+                                <div className="form-group full-width" style={{
+                                    background: 'var(--primary-light)',
+                                    padding: '1.25rem',
+                                    borderRadius: '16px',
+                                    border: '1px solid var(--primary)',
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(2, 1fr)',
+                                    gap: '1rem',
+                                    marginBottom: '1rem',
+                                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
+                                }}>
+                                    <div style={{ gridColumn: '1/-1', borderBottom: '1px solid var(--primary)', paddingBottom: '0.6rem', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary-dark)', fontWeight: 800 }}>
+                                        <Sparkles size={14} /> Integrated Project Data
+                                    </div>
+                                    <div>
+                                        <label style={{ fontSize: '0.65rem', color: 'var(--primary-dark)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>Project Code</label>
+                                        <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e293b' }}>{selectedProj.code}</div>
+                                    </div>
+                                    <div>
+                                        <label style={{ fontSize: '0.65rem', color: 'var(--primary-dark)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>Registry Status</label>
+                                        <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#059669' }}>{selectedProj.status}</div>
+                                    </div>
+                                    <div>
+                                        <label style={{ fontSize: '0.65rem', color: 'var(--primary-dark)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>Geo Scope</label>
+                                        <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#2563eb' }}>{selectedProj.geo_scope_level || 'Not Set'}</div>
+                                    </div>
+                                    <div>
+                                        <label style={{ fontSize: '0.65rem', color: 'var(--primary-dark)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>Location</label>
+                                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1e293b' }}>
+                                            {[
+                                                selectedProj.cluster_name,
+                                                selectedProj.mandal_name,
+                                                selectedProj.district_name,
+                                                selectedProj.state_name,
+                                                selectedProj.country_name
+                                            ].filter(Boolean).join(', ') || 'N/A'}
+                                        </div>
+                                    </div>
+                                    <div style={{ gridColumn: '1/-1' }}>
+                                        <label style={{ fontSize: '0.65rem', color: 'var(--primary-dark)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>Project Description</label>
+                                        <div style={{ fontSize: '0.85rem', color: '#475569', lineHeight: 1.5, marginTop: '2px' }}>{selectedProj.description || 'No description available for this project.'}</div>
+                                    </div>
+                                    <div>
+                                        <label style={{ fontSize: '0.65rem', color: 'var(--primary-dark)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>Start Date</label>
+                                        <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#1e293b' }}>{selectedProj.start_date}</div>
+                                    </div>
+                                    <div>
+                                        <label style={{ fontSize: '0.65rem', color: 'var(--primary-dark)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>End Date</label>
+                                        <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#1e293b' }}>{selectedProj.end_date || 'N/A'}</div>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Edit size={14} /> Facility (Master) Name <span style={{ color: 'var(--primary)' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Edit className="premium-input-icon" size={18} />
+                                    <input
+                                        type="text"
+                                        className="premium-input"
+                                        placeholder="e.g. Regional Health Center A"
+                                        value={formData.name || ''}
+                                        onChange={(e) => setFormData({ ...formData, name: validateAlphaNumeric(e.target.value, 100, 'facility_name') })}
+                                        required
+                                    />
+                                </div>
+                                {validationErrors.facility_name && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <X size={12} /> {validationErrors.facility_name}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="form-group full-width">
+                                <label className="premium-label"><LayoutGrid size={14} /> Structural Project Type <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={[
+                                            { id: 'SINGLE', name: 'Single Location' },
+                                            { id: 'MULTIPLE', name: 'Multiple Location' }
+                                        ]}
+                                        value={formData.project_type || 'SINGLE'}
+                                        onChange={(e) => setFormData({ ...formData, project_type: e.target.value })}
+                                        placeholder="Select Type..."
+                                        icon={LayoutGrid}
+                                        disabled={!!selectedProj?.project_type}
+                                        required
+                                    />
+                                </div>
+                                {selectedProj?.project_type && (
+                                    <span className="form-help-text" style={{ color: '#2563eb', fontWeight: 600 }}>
+                                        <ShieldCheck size={12} /> Fixed based on Project Type: {selectedProj.project_type === 'SINGLE' ? 'Single Location' : 'Multiple Location'}
+                                    </span>
+                                )}
+                            </div>
+
+                            <div className="form-group full-width">
+                                <label className="premium-label"><MapPin size={14} /> Location Name(s) <span style={{ color: 'var(--primary)' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <MapPin className="premium-input-icon" size={18} />
+                                    <input
+                                        type="text"
+                                        className="premium-input"
+                                        placeholder="Location name will be auto-populated from project geo scope"
+                                        value={formData.location_code || ''}
+                                        onChange={(e) => setFormData({ ...formData, location_code: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <span className="form-help-text">Location name from project's geographic scope. You can modify if needed.</span>
+                            </div>
+
+                            <div className="form-group">
+                                <label className="premium-label"><Clock size={14} /> Lifecycle Status</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={[
+                                            { id: 'PERMANENT', name: 'Permanent' },
+                                            { id: 'TEMPORARY', name: 'Temporary' }
+                                        ]}
+                                        value={formData.life || 'PERMANENT'}
+                                        onChange={(e) => setFormData({ ...formData, life: e.target.value })}
+                                        icon={Clock}
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Navigation size={14} /> Service Mode</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={[
+                                            { id: 'FIXED', name: 'Fixed / Static' },
+                                            { id: 'MOBILE', name: 'Mobile / Outbound' }
+                                        ]}
+                                        value={formData.mode || 'FIXED'}
+                                        onChange={(e) => setFormData({ ...formData, mode: e.target.value })}
+                                        icon={Navigation}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-group full-width">
+                                <label className="premium-label"><FileText size={14} /> Strategic Description</label>
+                                <div className="premium-input-wrapper" style={{ height: 'auto' }}>
+                                    <FileText className="premium-input-icon" size={18} style={{ marginTop: '0.75rem' }} />
+                                    <textarea
+                                        className="premium-input"
+                                        style={{ padding: '0.75rem 0.75rem 0.75rem 2.5rem', minHeight: '100px', resize: 'vertical' }}
+                                        rows="2"
+                                        placeholder="Operational description and purpose..."
+                                        value={formData.description || ''}
+                                        onChange={(e) => setFormData({ ...formData, description: capitalize(e.target.value) })}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><Users size={18} /> Role Mapping & Resource Tagging</div>
+                        <div className="form-grid">
+                            <div className="form-group">
+                                <label className="premium-label"><BarChart3 size={14} /> Filter Job Family</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={(jobFamilies || []).map(jf => ({ id: jf.id, name: jf.name }))}
+                                        value={formData._master_jf_filter || ''}
+                                        onChange={(e) => setFormData({ ...formData, _master_jf_filter: e.target.value, _master_rt_filter: '' })}
+                                        placeholder="All Families"
+                                        icon={BarChart3}
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Settings size={14} /> Filter Role Type</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={(roleTypes || []).filter(rt => rt.job_family == formData._master_jf_filter).map(rt => ({ id: rt.id, name: rt.name }))}
+                                        value={formData._master_rt_filter || ''}
+                                        onChange={(e) => setFormData({ ...formData, _master_rt_filter: e.target.value })}
+                                        placeholder="All Types"
+                                        icon={Settings}
+                                        disabled={!formData._master_jf_filter}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-group full-width">
+                                <label className="premium-label"><ShieldCheck size={14} /> Tagged Roles for this Template</label>
+                                <div style={{
+                                    maxHeight: '200px',
+                                    overflowY: 'auto',
+                                    border: '2px solid var(--primary-light)',
+                                    borderRadius: '16px',
+                                    padding: '1rem',
+                                    background: '#f8fafc',
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                                    gap: '0.75rem'
+                                }}>
+                                    {(roles || [])
+                                        .filter(r => !formData._master_jf_filter || r.job_family_id == formData._master_jf_filter)
+                                        .filter(r => !formData._master_rt_filter || r.role_type == formData._master_rt_filter)
+                                        .map(r => (
+                                            <label key={r.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '8px', background: 'white', border: '1px solid #f1f5f9', borderRadius: '8px', transition: 'all 0.2s ease' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={(formData.roles || []).includes(r.id)}
+                                                    onChange={(e) => {
+                                                        const currentRoles = formData.roles || [];
+                                                        const newRoles = e.target.checked
+                                                            ? [...currentRoles, r.id]
+                                                            : currentRoles.filter(id => id !== r.id);
+                                                        setFormData({ ...formData, roles: newRoles });
+                                                    }}
+                                                    style={{ width: '16px', height: '16px', accentColor: 'var(--primary)' }}
+                                                />
+                                                <span style={{ fontSize: '0.85rem', color: '#334155' }}>{r.name}</span>
+                                            </label>
+                                        ))
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+        case 'Job Families':
+        case 'JobFamilies':
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><BarChart3 size={18} /> Job Family Identity</div>
+                        <div className="form-grid">
+                            <div className="form-group">
+                                <label className="premium-label"><Network size={14} /> Family Code (Manual) <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Network className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="Enter Family Code" value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 16, 'fam_code') })} required />
+                                </div>
+                                {validationErrors.fam_code && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <X size={12} /> {validationErrors.fam_code}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="form-group">
+                                <label className="premium-label"><Edit size={14} /> Job Family Name <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Edit className="premium-input-icon" size={18} />
+                                    <input
+                                        type="text"
+                                        className="premium-input"
+                                        placeholder="Enter Job Family Name"
+                                        value={formData.name || ''}
+                                        onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value, 100, 'jf_name') })}
+                                        required
+                                    />
+                                </div>
+                                {validationErrors.jf_name && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <X size={12} /> {validationErrors.jf_name}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Calendar size={14} /> Start Date <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Calendar className="premium-input-icon" size={18} />
+                                    <input type="date" className="premium-input" value={formData.start_date || ''} onChange={(e) => setFormData({ ...formData, start_date: e.target.value })} required />
+                                </div>
+                            </div>
+
+                            <div className="form-group full-width">
+                                <label className="premium-label"><FileText size={14} /> Description</label>
+                                <div className="premium-input-wrapper" style={{ height: 'auto' }}>
+                                    <FileText className="premium-input-icon" size={18} style={{ marginTop: '0.75rem' }} />
+                                    <textarea className="premium-input" style={{ padding: '0.75rem 0.75rem 0.75rem 2.5rem', minHeight: '100px', resize: 'vertical' }} rows="3" value={formData.description || ''} onChange={(e) => setFormData({ ...formData, description: capitalize(e.target.value) })} />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+        case 'Role Types':
+        case 'RoleTypes':
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><Settings size={18} /> Role Type Identity</div>
+
+                        <div className="form-grid">
+                            <div className="form-group full-width">
+                                <label className="premium-label"><BarChart3 size={14} /> Structural Job Family <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={jobFamilies?.map(jf => ({ id: jf.id, name: jf.name })) || []}
+                                        value={formData.job_family || ''}
+                                        onChange={(e) => {
+                                            const jfId = e.target.value;
+                                            const nextCode = generateNextCode('RT', roleTypes, 'job_family', jfId);
+                                            setFormData({ ...formData, job_family: jfId, code: nextCode });
+                                        }}
+                                        placeholder="Select Parent Job Family..."
+                                        icon={BarChart3}
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Network size={14} /> Role Type Code (Manual) <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Network className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="Enter Role Type Code" value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 16, 'rt_code') })} required />
+                                </div>
+                                {validationErrors.rt_code && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <X size={12} /> {validationErrors.rt_code}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Edit size={14} /> Role Type Name <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Edit className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="Enter Role Type Name" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value, 100, 'rt_name') })} required />
+                                </div>
+                                {validationErrors.rt_name && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <X size={12} /> {validationErrors.rt_name}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Calendar size={14} /> Start Date <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Calendar className="premium-input-icon" size={18} />
+                                    <input
+                                        type="date"
+                                        className="premium-input"
+                                        value={formData.start_date || ''}
+                                        onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                                        required
+                                        min={formData.job_family ? (jobFamilies || []).find(jf => String(jf.id) === String(formData.job_family))?.start_date : ''}
+                                    />
+                                </div>
+                                {formData.job_family && (jobFamilies || []).find(jf => String(jf.id) === String(formData.job_family))?.start_date && (
+                                    <span className="form-help-text" style={{ color: 'var(--primary)', fontWeight: 600 }}>
+                                        Must be on or after job family start date: {(jobFamilies || []).find(jf => String(jf.id) === String(formData.job_family))?.start_date}
+                                    </span>
+                                )}
+                            </div>
+
+                            <div className="form-group full-width">
+                                <label className="premium-label"><FileText size={14} /> Description</label>
+                                <div className="premium-input-wrapper" style={{ height: 'auto' }}>
+                                    <FileText className="premium-input-icon" size={18} style={{ marginTop: '0.75rem' }} />
+                                    <textarea className="premium-input" style={{ padding: '0.75rem 0.75rem 0.75rem 2.5rem', minHeight: '100px', resize: 'vertical' }} rows="2" value={formData.description || ''} onChange={(e) => setFormData({ ...formData, description: e.target.value })} />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+        case 'Role Names':
+        case 'Roles':
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><Settings size={18} /> Role Identity</div>
+                        <div className="form-grid">
+                            <div className="form-group">
+                                <label className="premium-label"><Layers size={14} /> Parent Job Family <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={jobFamilies?.map(jf => ({ id: jf.id, name: jf.name })) || []}
+                                        value={formData.job_family || ''}
+                                        onChange={(e) => setFormData({ ...formData, job_family: e.target.value, role_type: '' })}
+                                        placeholder="Select Job Family..."
+                                        icon={Layers}
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Settings size={14} /> Role Type <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={(roleTypes || [])
+                                            .filter(rt => !formData.job_family || rt.job_family == formData.job_family)
+                                            .map(rt => ({ id: rt.id, name: rt.name }))
+                                        }
+                                        value={formData.role_type || ''}
+                                        onChange={(e) => {
+                                            const rtId = e.target.value;
+                                            const nextCode = generateNextCode('RL', roles, 'role_type', rtId);
+                                            setFormData({ ...formData, role_type: rtId, code: nextCode });
+                                        }}
+                                        placeholder="Select Role Type..."
+                                        icon={Settings}
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Network size={14} /> Role Code (Manual) <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Network className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="Enter Role Code" value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 16, 'role_code') })} required />
+                                </div>
+                                {validationErrors.role_code && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <X size={12} /> {validationErrors.role_code}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Edit size={14} /> Role Name <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Edit className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="Enter Role Name" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value, 100, 'role_name') })} required />
+                                </div>
+                                {validationErrors.role_name && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <X size={12} /> {validationErrors.role_name}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Calendar size={14} /> Start Date <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Calendar className="premium-input-icon" size={18} />
+                                    <input
+                                        type="date"
+                                        className="premium-input"
+                                        value={formData.start_date || ''}
+                                        onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                                        required
+                                        min={formData.role_type ? (roleTypes || []).find(rt => String(rt.id) === String(formData.role_type))?.start_date : ''}
+                                    />
+                                </div>
+                                {formData.role_type && (roleTypes || []).find(rt => String(rt.id) === String(formData.role_type))?.start_date && (
+                                    <span className="form-help-text" style={{ color: 'var(--primary)', fontWeight: 600 }}>
+                                        Must be on or after role type start date: {(roleTypes || []).find(rt => String(rt.id) === String(formData.role_type))?.start_date}
+                                    </span>
+                                )}
+                            </div>
+
+                            <div className="form-group full-width">
+                                <label className="premium-label"><FileText size={14} /> Description</label>
+                                <div className="premium-input-wrapper" style={{ height: 'auto' }}>
+                                    <FileText className="premium-input-icon" size={18} style={{ marginTop: '0.75rem' }} />
+                                    <textarea className="premium-input" style={{ padding: '0.75rem 0.75rem 0.75rem 2.5rem', minHeight: '100px', resize: 'vertical' }} rows="2" value={formData.description || ''} onChange={(e) => setFormData({ ...formData, description: e.target.value })} />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+        case 'Jobs':
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><ClipboardList size={18} /> Job Identity</div>
+
+                        <div className="form-grid">
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Briefcase size={14} /> Job Family <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={jobFamilies?.map(jf => ({ id: jf.id, name: jf.name })) || []}
+                                        value={formData.job_family || ''}
+                                        onChange={(e) => setFormData({ ...formData, job_family: e.target.value, role_type: '', role: '' })}
+                                        placeholder="Select Job Family..."
+                                        icon={Briefcase}
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Settings size={14} /> Role Type <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={(roleTypes || [])
+                                            .filter(rt => rt.job_family == formData.job_family)
+                                            .map(rt => ({ id: rt.id, name: rt.name }))
+                                        }
+                                        value={formData.role_type || ''}
+                                        onChange={(e) => setFormData({ ...formData, role_type: e.target.value, role: '' })}
+                                        disabled={!formData.job_family}
+                                        placeholder="Select Role Type..."
+                                        icon={Settings}
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Settings size={14} /> Associated Role <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={(roles || [])
+                                            .filter(r => r.role_type == formData.role_type)
+                                            .map(r => ({ id: r.id, name: r.name }))
+                                        }
+                                        value={formData.role || ''}
+                                        onChange={(e) => {
+                                            const rId = e.target.value;
+                                            const nextCode = generateNextCode('JB', jobs, 'role', rId);
+                                            setFormData({ ...formData, role: rId, code: nextCode });
+                                        }}
+                                        placeholder="Select Role..."
+                                        icon={Settings}
+                                        required
+                                        disabled={!formData.role_type}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Network size={14} /> Job Code (Manual) <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Network className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="Enter Job Code" value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 16, 'job_code') })} required />
+                                </div>
+                                {validationErrors.job_code && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <X size={12} /> {validationErrors.job_code}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Edit size={14} /> Job Name <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Edit className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="Enter Job Name" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value, 100, 'job_name') })} required />
+                                </div>
+                                {validationErrors.job_name && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <X size={12} /> {validationErrors.job_name}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Calendar size={14} /> Start Date <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Calendar className="premium-input-icon" size={18} />
+                                    <input
+                                        type="date"
+                                        className="premium-input"
+                                        value={formData.start_date || ''}
+                                        onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                                        required
+                                        min={formData.role ? (roles || []).find(r => String(r.id) === String(formData.role))?.start_date : ''}
+                                    />
+                                </div>
+                                {formData.role && (roles || []).find(r => String(r.id) === String(formData.role))?.start_date && (
+                                    <span className="form-help-text" style={{ color: 'var(--primary)', fontWeight: 600 }}>
+                                        Must be on or after role start date: {(roles || []).find(r => String(r.id) === String(formData.role))?.start_date}
+                                    </span>
+                                )}
+                            </div>
+
+                            <div className="form-group full-width">
+                                <label className="premium-label"><FileText size={14} /> Description</label>
+                                <div className="premium-input-wrapper" style={{ height: 'auto' }}>
+                                    <FileText className="premium-input-icon" size={18} style={{ marginTop: '0.75rem' }} />
+                                    <textarea className="premium-input" style={{ padding: '0.75rem 0.75rem 0.75rem 2.5rem', minHeight: '100px', resize: 'vertical' }} rows="2" value={formData.description || ''} onChange={(e) => setFormData({ ...formData, description: e.target.value })} />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+        case 'Tasks':
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><Layers size={18} /> Task Context</div>
+                        <div className="form-grid">
+                            <div className="form-group">
+                                <label className="premium-label"><Briefcase size={14} /> Job Family <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={jobFamilies?.map(jf => ({ id: jf.id, name: jf.name })) || []}
+                                        value={formData.job_family || ''}
+                                        onChange={(e) => setFormData({ ...formData, job_family: e.target.value, role_type: '', role: '', job: '' })}
+                                        placeholder="Select Job Family..."
+                                        icon={Briefcase}
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Layers size={14} /> Role Type <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={(roleTypes || []).filter(rt => rt.job_family == formData.job_family).map(rt => ({ id: rt.id, name: rt.name }))}
+                                        value={formData.role_type || ''}
+                                        disabled={!formData.job_family}
+                                        onChange={(e) => setFormData({ ...formData, role_type: e.target.value, role: '', job: '' })}
+                                        placeholder="Select Role Type..."
+                                        icon={Layers}
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><UserSquare2 size={14} /> Role Name <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={(roles || []).filter(r => r.role_type == formData.role_type).map(r => ({ id: r.id, name: r.name }))}
+                                        value={formData.role || ''}
+                                        disabled={!formData.role_type}
+                                        onChange={(e) => setFormData({ ...formData, role: e.target.value, job: '' })}
+                                        placeholder="Select Role..."
+                                        icon={UserSquare2}
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><ClipboardList size={14} /> Associated Job <span style={{ color: 'var(--primary)' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={(jobs || []).filter(j => j.role == formData.role).map(j => ({ id: j.id, name: j.name }))}
+                                        value={formData.job || ''}
+                                        disabled={!formData.role}
+                                        onChange={(e) => {
+                                            const jId = e.target.value;
+                                            const nextCode = generateNextCode('TK', tasks, 'job', jId);
+                                            setFormData({ ...formData, job: jId, code: nextCode });
+                                        }}
+                                        placeholder="Select Job..."
+                                        icon={ClipboardList}
+                                        required
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><ClipboardList size={18} /> Task Details</div>
+                        <div className="form-grid">
+                            <div className="form-group">
+                                <label className="premium-label"><Network size={14} /> Task Code (Manual) <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Network className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="Enter Task Code" value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 16, 'task_code') })} required />
+                                </div>
+                                {validationErrors.task_code && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <X size={12} /> {validationErrors.task_code}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><TrendingUp size={14} /> Priority</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={[
+                                            { id: 'HIGH', name: 'High' },
+                                            { id: 'MEDIUM', name: 'Medium' },
+                                            { id: 'LOW', name: 'Low' }
+                                        ]}
+                                        value={formData.priority || 'MEDIUM'}
+                                        onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                                        placeholder="Select Priority..."
+                                        icon={TrendingUp}
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Edit size={14} /> Task Name <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Edit className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="Enter Task Name" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value, 150, 'task_name') })} required />
+                                </div>
+                                {validationErrors.task_name && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <X size={12} /> {validationErrors.task_name}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Calendar size={14} /> Start Date <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Calendar className="premium-input-icon" size={18} />
+                                    <input
+                                        type="date"
+                                        className="premium-input"
+                                        value={formData.start_date || ''}
+                                        onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                                        required
+                                        min={formData.job ? (jobs || []).find(j => String(j.id) === String(formData.job))?.start_date : ''}
+                                    />
+                                </div>
+                                {formData.job && (jobs || []).find(j => String(j.id) === String(formData.job))?.start_date && (
+                                    <span className="form-help-text" style={{ color: 'var(--primary)', fontWeight: 600 }}>
+                                        Must be on or after job start date: {(jobs || []).find(j => String(j.id) === String(formData.job))?.start_date}
+                                    </span>
+                                )}
+                            </div>
+
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Link size={14} /> Allowed URL Patterns (One per line)</label>
+                                <div className="premium-input-wrapper" style={{ height: 'auto' }}>
+                                    <Link className="premium-input-icon" size={18} style={{ marginTop: '0.75rem' }} />
+                                    <textarea
+                                        className="premium-input"
+                                        style={{ padding: '0.75rem 0.75rem 0.75rem 2.5rem', minHeight: '100px', resize: 'vertical' }}
+                                        rows="4"
+                                        placeholder="/employees\n/reports/*\n/settings"
+                                        value={formData.urls_text !== undefined ? formData.urls_text : (formData.urls || []).map(u => u.url_pattern).join('\n')}
+                                        onChange={(e) => {
+                                            const text = e.target.value;
+                                            setFormData({
+                                                ...formData,
+                                                urls_text: text,
+                                                urls_list: text.split('\n').filter(line => line.trim() !== '')
+                                            });
+                                        }}
+                                    />
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <ShieldCheck size={12} /> Users with this task will have permission to access these routes. Use * for wildcards.
+                                </div>
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="premium-label"><FileText size={14} /> Description</label>
+                                <div className="premium-input-wrapper" style={{ height: 'auto' }}>
+                                    <FileText className="premium-input-icon" size={18} style={{ marginTop: '0.75rem' }} />
+                                    <textarea className="premium-input" style={{ padding: '0.75rem 0.75rem 0.75rem 2.5rem', minHeight: '100px', resize: 'vertical' }} rows="2" value={formData.description || ''} onChange={(e) => setFormData({ ...formData, description: e.target.value })} />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+
+        case 'Employees':
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+
+                    {/* Identity Section */}
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><Users size={18} /> Personal Identity</div>
+
+                        {/* Profile Photo Upload Header */}
+                        <div style={{ marginBottom: '2rem' }}>
+                            <div className="premium-label"><UserCircle size={14} /> Profile Representation</div>
+                            <div className="photo-upload-card">
+                                <div className="photo-preview-box">
+                                    {formData.photo ? (
+                                        <img
+                                            src={
+                                                formData.photo instanceof File
+                                                    ? URL.createObjectURL(formData.photo)
+                                                    : (formData.photo.startsWith('http') || formData.photo.startsWith('data:image'))
+                                                        ? formData.photo
+                                                        : `http://${window.location.hostname}:8000${formData.photo.startsWith('/') ? '' : '/'}${formData.photo}`
+                                            }
+                                            alt="Preview"
+                                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                        />
+                                    ) : (
+                                        <User size={64} color="#e2e8f0" />
+                                    )}
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ marginBottom: '1.25rem' }}>
+                                        <h4 style={{ margin: '0 0 6px 0', fontSize: '1.1rem', fontWeight: 800, color: '#1e293b' }}>Global Profile Photo</h4>
+                                        <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', lineHeight: 1.5 }}>
+                                            High-quality professional headshots are recommended. <br />
+                                            Supports PNG, JPG (Max 5MB).
+                                        </p>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                        <label className="premium-file-btn">
+                                            <Upload size={16} /> Choose New Image
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={(e) => setFormData({ ...formData, photo: e.target.files[0] })}
+                                                style={{ display: 'none' }}
+                                            />
+                                        </label>
+                                        {formData.photo && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setFormData({ ...formData, photo: null })}
+                                                style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                            >
+                                                <X size={14} /> Remove Photo
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="form-grid">
+                            <div className="form-group">
+                                <label className="premium-label"><Network size={14} /> Employee Code (Manual) <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Network className="premium-input-icon" size={18} />
+                                    <input
+                                        type="text"
+                                        className="premium-input"
+                                        placeholder="Enter Employee Code"
+                                        value={formData.employee_code || ''}
+                                        onChange={(e) => {
+                                            const code = validateCode(e.target.value, 16, 'employee_code');
+                                            setFormData({ ...formData, employee_code: code });
+
+                                            // Immediate duplicate check against pre-loaded list
+                                            if (code && allEmployees.some(emp => String(emp.employee_code).toUpperCase() === code.toUpperCase() && String(emp.id) !== String(formData.id))) {
+                                                showValidationError('employee_code', 'This Employee Code already exists');
+                                            }
+                                        }}
+                                        required
+                                    />
+                                </div>
+                                {validationErrors.employee_code && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.7rem', marginTop: '4px', marginLeft: '3rem' }}>
+                                        ⚠ {validationErrors.employee_code}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="form-group">
+                                <label className="premium-label"><Edit size={14} /> Full Legal Name <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <User className="premium-input-icon" size={18} />
+                                    <input
+                                        type="text"
+                                        className="premium-input"
+                                        placeholder="Enter Full Legal Name"
+                                        value={formData.name || ''}
+                                        onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value, 100, 'employee_name') })}
+                                        required
+                                    />
+                                </div>
+                                {validationErrors.employee_name && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.7rem', marginTop: '4px', marginLeft: '3rem' }}>
+                                        ⚠ {validationErrors.employee_name}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="form-group">
+                                <label className="premium-label"><User size={14} /> Father's Name</label>
+                                <div className="premium-input-wrapper">
+                                    <User className="premium-input-icon" size={18} />
+                                    <input
+                                        type="text"
+                                        className="premium-input"
+                                        placeholder="Enter Father's Name"
+                                        value={formData.father_name || ''}
+                                        onChange={(e) => setFormData({ ...formData, father_name: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-group">
+                                <label className="premium-label"><User size={14} /> Mother's Name</label>
+                                <div className="premium-input-wrapper">
+                                    <User className="premium-input-icon" size={18} />
+                                    <input
+                                        type="text"
+                                        className="premium-input"
+                                        placeholder="Enter Mother's Name"
+                                        value={formData.mother_name || ''}
+                                        onChange={(e) => setFormData({ ...formData, mother_name: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Phone size={14} /> Phone Number <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Phone className="premium-input-icon" size={18} />
+                                    <input
+                                        type="tel"
+                                        className="premium-input"
+                                        placeholder="10-digit number"
+                                        value={formData.phone || ''}
+                                        onChange={(e) => setFormData({ ...formData, phone: validatePhone(e.target.value, 'employee_phone') })}
+                                        required
+                                    />
+                                </div>
+                                {validationErrors.employee_phone && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.7rem', marginTop: '4px', marginLeft: '3rem' }}>
+                                        ⚠ {validationErrors.employee_phone}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Mail size={14} /> Personal Email <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Mail className="premium-input-icon" size={18} />
+                                    <input
+                                        type="email"
+                                        className="premium-input"
+                                        placeholder="Enter Personal Email (e.g. user@gmail.com)"
+                                        value={formData.personal_email || ''}
+                                        onChange={(e) => setFormData({ ...formData, personal_email: validateEmailStrict(e.target.value, 'personal_email') })}
+                                        required
+                                    />
+                                </div>
+                                {validationErrors.personal_email && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.7rem', marginTop: '4px', marginLeft: '3rem' }}>
+                                        ⚠ {validationErrors.personal_email}
+                                    </div>
+                                )}
+                                {formData.personal_email && !isEmailValid(formData.personal_email) && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.7rem', marginTop: '4px', marginLeft: '3rem' }}>
+                                        ⚠ Email must end with @.com or .in
+                                    </div>
+                                )}
+                            </div>
+
+
+                            {!formData._is_profile_edit && (
+                                <>
+                                    <div className="form-group">
+                                        <label className="premium-label"><Calendar size={14} /> Joining Date <span style={{ color: '#ef4444' }}>*</span></label>
+                                        <div className="premium-input-wrapper">
+                                            <Calendar className="premium-input-icon" size={18} />
+                                            <input type="date" className="premium-input" value={formData.hire_date || ''} onChange={(e) => setFormData({ ...formData, hire_date: e.target.value || null })} required max="2099-12-31" />
+                                        </div>
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="premium-label"><Briefcase size={14} /> Employment Type <span style={{ color: '#ef4444' }}>*</span></label>
+                                        <div className="premium-input-wrapper">
+                                            <SearchableSelect
+                                                options={[
+                                                    { id: 'Permanent', name: 'Permanent' },
+                                                    { id: 'Temporary', name: 'Temporary / Contract' }
+                                                ]}
+                                                value={formData.employment_type || 'Permanent'}
+                                                onChange={(e) => setFormData({ ...formData, employment_type: e.target.value })}
+                                                placeholder="Select Employment Type"
+                                                icon={Briefcase}
+                                            />
+                                        </div>
+                                    </div>
+                                    {formData.employment_type === 'Temporary' && (
+                                        <div className="form-group fade-in">
+                                            <label className="premium-label"><Calendar size={14} /> Contract End Date <span style={{ color: '#ef4444' }}>*</span></label>
+                                            <div className="premium-input-wrapper">
+                                                <Calendar className="premium-input-icon" size={18} />
+                                                <input type="date" className="premium-input" value={formData.employment_end_date || ''} onChange={(e) => setFormData({ ...formData, employment_end_date: e.target.value })} required />
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Records Section */}
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><UserCircle size={18} /> Employee Identity & Records</div>
+                        <div className="form-grid">
+
+                            <div className="form-group">
+                                <label className="premium-label"><Calendar size={14} /> Date of Birth <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Calendar className="premium-input-icon" size={18} />
+                                    <input type="date" className="premium-input" value={formData.date_of_birth || ''} onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })} required />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Users size={14} /> Gender <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={[
+                                            { id: 'Male', name: 'Male' },
+                                            { id: 'Female', name: 'Female' },
+                                            { id: 'Other', name: 'Other' },
+                                            { id: 'Hidden', name: 'Prefer not to say' }
+                                        ]}
+                                        value={formData.gender || ''}
+                                        onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                                        placeholder="Select Gender..."
+                                        icon={Users}
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><ShieldCheck size={14} /> Blood Group</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(bg => ({ id: bg, name: bg }))}
+                                        value={formData.blood_group || ''}
+                                        onChange={(e) => setFormData({ ...formData, blood_group: e.target.value })}
+                                        placeholder="Select Blood Group..."
+                                        icon={ShieldCheck}
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><FileDigit size={14} /> Aadhaar Number</label>
+                                <div className="premium-input-wrapper">
+                                    <FileDigit className="premium-input-icon" size={18} />
+                                    <input
+                                        type="text"
+                                        className="premium-input"
+                                        placeholder="12-digit Aadhaar Number"
+                                        value={formData.aadhaar_number || ''}
+                                        onChange={(e) => setFormData({ ...formData, aadhaar_number: validateNumbers(e.target.value, 12, 'aadhaar_number') })}
+                                    />
+                                </div>
+                                {validationErrors.aadhaar_number && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.7rem', marginTop: '4px', marginLeft: '3rem' }}>
+                                        ⚠ {validationErrors.aadhaar_number}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><FileText size={14} /> PAN Number</label>
+                                <div className="premium-input-wrapper">
+                                    <FileText className="premium-input-icon" size={18} />
+                                    <input
+                                        type="text"
+                                        className="premium-input"
+                                        placeholder="10-char PAN Number"
+                                        value={formData.pan_number || ''}
+                                        onChange={(e) => setFormData({ ...formData, pan_number: validateAlphaNumeric(e.target.value, 10, 'pan_number').toUpperCase() })}
+                                    />
+                                </div>
+                                {validationErrors.pan_number && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.7rem', marginTop: '4px', marginLeft: '3rem' }}>
+                                        ⚠ {validationErrors.pan_number}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="premium-label"><MapPin size={14} /> Primary Residential Address</label>
+                                <div className="premium-input-wrapper">
+                                    <MapPin className="premium-input-icon" style={{ top: '1.5rem', transform: 'none' }} size={18} />
+                                    <textarea
+                                        className="premium-input"
+                                        rows="3"
+                                        placeholder="Full permanent address details..."
+                                        value={formData.address || ''}
+                                        onChange={(e) => setFormData({ ...formData, address: validateAddress(e.target.value, 500, 'employee_address') })}
+                                        style={{ paddingLeft: '3rem', paddingTop: '1rem' }}
+                                    />
+                                </div>
+                                {validationErrors.employee_address && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.7rem', marginTop: '4px', marginLeft: '3rem' }}>
+                                        ⚠ {validationErrors.employee_address}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Account & Operational Status */}
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}>
+                            <ShieldCheck size={18} /> {formData.id ? 'Account Status' : 'New Account Initialization'}
+                        </div>
+                        <div className="form-grid">
+                            <div className="form-group">
+                                <label className="premium-label"><ShieldCheck size={14} /> Employment Status</label>
+                                <div className="location-type-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+                                    <div className={`type-card ${formData.status === 'Active' ? 'active' : ''}`} onClick={() => setFormData({ ...formData, status: 'Active', status_date: null, _inactivation_type: '' })}>
+                                        <div style={{ fontWeight: 800 }}>ACTIVE</div>
+                                        <div style={{ fontSize: '0.7rem', opacity: 0.7 }}>In Service</div>
+                                    </div>
+                                    <div className={`type-card ${formData.status === 'Suspicious' || formData.status === 'Suspended' ? 'active' : ''}`}
+                                        onClick={() => setFormData({ ...formData, status: 'Suspended', status_date: null, _inactivation_type: '' })}
+                                        style={(formData.status === 'Suspicious' || formData.status === 'Suspended') ? { borderColor: '#f59e0b', background: '#fffbeb' } : {}}
+                                    >
+                                        <div style={{ fontWeight: 800, color: (formData.status === 'Suspicious' || formData.status === 'Suspended') ? '#d97706' : 'inherit' }}>SUSPENDED</div>
+                                        <div style={{ fontSize: '0.7rem', opacity: 0.7 }}>Under Review</div>
+                                    </div>
+                                    <div className={`type-card ${formData.status === 'Inactive' ? 'active' : ''}`} onClick={() => setFormData({ ...formData, status: 'Inactive', _inactivation_type: 'Immediate', status_date: new Date().toISOString().split('T')[0] })}>
+                                        <div style={{ fontWeight: 800 }}>INACTIVE</div>
+                                        <div style={{ fontSize: '0.7rem', opacity: 0.7 }}>Terminated / Left</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {formData.status === 'Inactive' && (
+                                <div className="form-group fade-in">
+                                    <label className="premium-label"><Clock size={14} /> Inactivation Timing</label>
+                                    <div className="location-type-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
+                                        <div className={`type-card ${formData._inactivation_type === 'Immediate' ? 'active' : ''}`}
+                                            onClick={() => setFormData({ ...formData, _inactivation_type: 'Immediate', status_date: new Date().toISOString().split('T')[0] })}>
+                                            <div style={{ fontWeight: 800 }}>IMMEDIATE</div>
+                                            <div style={{ fontSize: '0.7rem', opacity: 0.7 }}>Effective Today</div>
+                                        </div>
+                                        <div className={`type-card ${formData._inactivation_type === 'Not Immediate' ? 'active' : ''}`}
+                                            onClick={() => setFormData({ ...formData, _inactivation_type: 'Not Immediate' })}>
+                                            <div style={{ fontWeight: 800 }}>SCHEDULED</div>
+                                            <div style={{ fontSize: '0.7rem', opacity: 0.7 }}>Future Date</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {formData.status === 'Inactive' && formData._inactivation_type === 'Not Immediate' && (
+                                <div className="form-group full-width fade-in">
+                                    <label className="premium-label" style={{ color: '#ef4444' }}><Calendar size={14} /> Separation Effective Date <span style={{ color: '#ef4444' }}>*</span></label>
+                                    <div className="premium-input-wrapper" style={{ borderColor: '#ef4444' }}>
+                                        <Calendar className="premium-input-icon" size={18} style={{ color: '#ef4444' }} />
+                                        <input
+                                            type="date"
+                                            className="premium-input"
+                                            value={formData.status_date || ''}
+                                            onChange={(e) => setFormData({ ...formData, status_date: e.target.value })}
+                                            required
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Assignment Section (Conditional) */}
+                    {!formData._is_profile_edit && (
+                        <div className="premium-form-section">
+                            <div className="form-section-title" style={{ marginBottom: '2rem' }}><Navigation size={18} /> Current Assignment</div>
+                            <div className="form-group full-width">
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.25rem', marginBottom: '1.5rem' }}>
+                                    <div className="form-group">
+                                        <label className="premium-label"><LayoutGrid size={14} /> Level</label>
+                                        <SearchableSelect
+                                            options={orgLevels || []}
+                                            value={formData._emp_level_filter || ''}
+                                            onChange={(e) => setFormData({ ...formData, _emp_level_filter: e.target.value, _emp_office_filter: '', _emp_dept_filter: '', _emp_section_filter: '' })}
+                                            placeholder="All Levels"
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="premium-label"><Building2 size={14} /> Office</label>
+                                        <SearchableSelect
+                                            options={(offices || []).filter(o => !formData._emp_level_filter || String(o.level_id || (typeof o.level === 'object' ? o.level?.id : o.level)) === String(formData._emp_level_filter))}
+                                            value={formData._emp_office_filter || ''}
+                                            onChange={(e) => setFormData({ ...formData, _emp_office_filter: e.target.value, _emp_dept_filter: '', _emp_section_filter: '' })}
+                                            placeholder="All Offices"
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="premium-label"><Briefcase size={14} /> Department</label>
+                                        <SearchableSelect
+                                            options={(departments || []).filter(d => String(d.office || d.office_id) === String(formData._emp_office_filter))}
+                                            value={formData._emp_dept_filter || ''}
+                                            onChange={(e) => setFormData({ ...formData, _emp_dept_filter: e.target.value, _emp_section_filter: '' })}
+                                            disabled={!formData._emp_office_filter}
+                                            placeholder="All Departments"
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="premium-label"><Layers size={14} /> Section</label>
+                                        <SearchableSelect
+                                            options={(sections || []).filter(s => String(s.department || s.department_id) === String(formData._emp_dept_filter))}
+                                            value={formData._emp_section_filter || ''}
+                                            onChange={(e) => setFormData({ ...formData, _emp_section_filter: e.target.value })}
+                                            disabled={!formData._emp_dept_filter}
+                                            placeholder={formData._emp_dept_filter ? "All Sections" : "Select Dept First"}
+                                            icon={Layers}
+                                        />
+                                    </div>
+                                </div>
+
+                                <label className="premium-label"><Briefcase size={14} /> Assigned Position(s) <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div style={{
+                                    maxHeight: '300px',
+                                    overflowY: 'auto',
+                                    padding: '1.5rem',
+                                    background: '#f8fafc',
+                                    borderRadius: '20px',
+                                    border: '1px solid #e2e8f0',
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                                    gap: '1rem'
+                                }}>
+                                    {(getFilteredPositions() || []).length > 0 ? (getFilteredPositions() || []).map(p => (
+                                        <label key={p.id} style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '12px',
+                                            padding: '12px',
+                                            background: 'white',
+                                            border: (formData.positions || []).includes(Number(p.id)) ? '2px solid #fb923c' : '2px solid #f1f5f9',
+                                            borderRadius: '16px',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s',
+                                            boxShadow: (formData.positions || []).includes(Number(p.id)) ? '0 4px 6px -1px rgba(251, 146, 60, 0.1)' : 'none'
+                                        }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={(formData.positions || []).includes(Number(p.id))}
+                                                onChange={(e) => {
+                                                    const currentIds = (formData.positions || []).map(id => Number(id));
+                                                    const pid = Number(p.id);
+                                                    const newIds = e.target.checked ? [...currentIds, pid] : currentIds.filter(id => id !== pid);
+                                                    setFormData({ ...formData, positions: newIds });
+                                                }}
+                                                style={{ accentColor: '#fb923c', width: '18px', height: '18px' }}
+                                            />
+                                            <div>
+                                                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e293b' }}>{p.name}</div>
+                                                <div style={{ fontSize: '0.7rem', color: '#64748b' }}>{p.office_display || p.office_name} • {p.department_display || p.department_name}</div>
+                                            </div>
+                                        </label>
+                                    )) : (
+                                        <div style={{ gridColumn: '1 / -1', padding: '3rem', textAlign: 'center' }}>
+                                            <Users size={48} style={{ margin: '0 auto 1rem', opacity: 0.1 }} />
+                                            <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.9rem', fontWeight: 500 }}>No positions found matching your selection.</p>
+                                        </div>
+                                    )}
+                                </div>
+                                <div style={{ marginTop: '0.75rem', fontSize: '0.8rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <ShieldCheck size={14} /> Administrative oversight required for position changes.
+                                </div>
+                            </div>
+                        </div>
+                    )
+                    }
+                </div >
+            );
+
+
+
+        case 'Projects':
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                    {/* Project Core Identity */}
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><FolderKanban size={18} /> Project Core Identity</div>
+                        <div className="form-grid">
+                            <div className="form-group">
+                                <label className="premium-label"><Network size={14} /> Project Code (Manual) <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Network className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="Enter Project Code" value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 16, 'proj_code') })} required />
+                                </div>
+                                {validationErrors.proj_code && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.7rem', marginTop: '4px', marginLeft: '3rem' }}>
+                                        ⚠ {validationErrors.proj_code}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Edit size={14} /> Project Name <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Edit className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="Enter Project Name" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateAlphaNumeric(e.target.value, 200, 'proj_name') })} required />
+                                </div>
+                                {validationErrors.proj_name && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.7rem', marginTop: '4px', marginLeft: '3rem' }}>
+                                        ⚠ {validationErrors.proj_name}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="form-group">
+                                <label className="premium-label"><TrendingUp size={14} /> Status</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={[
+                                            { id: 'Active', name: 'Active' },
+                                            { id: 'Planning', name: 'Planning' },
+                                            { id: 'On Hold', name: 'On Hold' },
+                                            { id: 'Completed', name: 'Completed' },
+                                            { id: 'Archived', name: 'Archived' }
+                                        ]}
+                                        value={formData.status || 'Active'}
+                                        onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                                        placeholder="Select Status..."
+                                        icon={TrendingUp}
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Briefcase size={14} /> Client Type</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={[
+                                            { id: 'Private', name: 'Private' },
+                                            { id: 'Government', name: 'Government / Public Sector' }
+                                        ]}
+                                        value={formData.client_type || 'Private'}
+                                        onChange={(e) => setFormData({ ...formData, client_type: e.target.value })}
+                                        placeholder="Select Client Type..."
+                                        icon={Briefcase}
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><LayoutGrid size={14} /> Project Type <span style={{ color: 'var(--primary)' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={[
+                                            { id: 'SINGLE', name: 'Single Location' },
+                                            { id: 'MULTIPLE', name: 'Multiple Location' }
+                                        ]}
+                                        value={formData.project_type || 'SINGLE'}
+                                        onChange={(e) => setFormData({ ...formData, project_type: e.target.value })}
+                                        placeholder="Select Project Type..."
+                                        icon={LayoutGrid}
+                                        required
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Timeline & Details */}
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><History size={18} /> Implementation Period & Scope</div>
+                        <div className="form-grid">
+                            <div className="form-group">
+                                <label className="premium-label"><Calendar size={14} /> Start Date <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Calendar className="premium-input-icon" size={18} />
+                                    <input type="date" className="premium-input" value={formData.start_date || ''} onChange={(e) => setFormData({ ...formData, start_date: e.target.value })} required />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Calendar size={14} /> End Date (Planned)</label>
+                                <div className="premium-input-wrapper">
+                                    <Calendar className="premium-input-icon" size={18} />
+                                    <input type="date" className="premium-input" value={formData.end_date || ''} onChange={(e) => setFormData({ ...formData, end_date: e.target.value })} />
+                                </div>
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="premium-label"><FileText size={14} /> Project Description / Scope</label>
+                                <div className="premium-input-wrapper">
+                                    <FileText className="premium-input-icon" style={{ top: '1.5rem', transform: 'none' }} size={18} />
+                                    <textarea className="premium-input" rows="3" placeholder="Define the core objectives and scope of this project..." value={formData.description || ''} onChange={(e) => setFormData({ ...formData, description: capitalize(e.target.value) })} style={{ paddingLeft: '3rem', paddingTop: '1rem' }} />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Geo Scope Jurisdiction */}
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><Globe size={18} /> Geo Scope & Operational Jurisdiction</div>
+                        <div className="form-grid">
+                            <div className="form-group full-width" style={{ marginBottom: '1.5rem' }}>
+                                <label className="premium-label"><Layers size={14} /> Targeted Geographic Level (Geo Scope) <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={[
+                                            { id: 'Territory', name: 'Territory (Global/Continent)' },
+                                            { id: 'Country', name: 'Country' },
+                                            { id: 'State', name: 'State / Province' },
+                                            { id: 'District', name: 'District' },
+                                            { id: 'Mandal', name: 'Mandal / Taluk' },
+                                            { id: 'Cluster', name: 'Cluster (Metropolitan/City/Town/Village)' }
+                                        ]}
+                                        value={formData.geo_scope_level || ''}
+                                        onChange={(e) => {
+                                            const newLevel = e.target.value;
+                                            setFormData({
+                                                ...formData,
+                                                geo_scope_level: newLevel,
+                                                continent_name: '', country_name: '', state_name: '', district_name: '', mandal_name: '',
+                                                cluster: '', cluster_name: '', location: '',
+                                                latitude: '', longitude: ''
+                                            });
+                                        }}
+                                        placeholder="Select Target Level..."
+                                        icon={Layers}
+                                        required
+                                    />
+                                </div>
+                                <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '6px' }}>
+                                    Select the granularity of this project's geographic scope. Higher levels automatically include all child jurisdictions.
+                                </div>
+                            </div>
+
+                            {/* Dynamic Dropdowns based on Level */}
+                            {formData.geo_scope_level && (
+                                <>
+                                    <div className="form-group">
+                                        <label className="premium-label"><Globe size={14} /> Territory</label>
+                                        <div className="premium-input-wrapper">
+                                            <SearchableSelect
+                                                options={geoContinents?.map(c => ({ id: c.name, name: c.name })) || []}
+                                                value={formData.continent_name || ''}
+                                                onChange={(e) => setFormData({ ...formData, continent_name: e.target.value, country_name: '', state_name: '', district_name: '', mandal_name: '', location: '', hamlet_name: '', latitude: '', longitude: '' })}
+                                                placeholder="Select Territory..."
+                                                icon={Globe}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {(['Country', 'State', 'District', 'Mandal', 'Cluster'].includes(formData.geo_scope_level)) && (
+                                        <div className="form-group">
+                                            <label className="premium-label"><Globe size={14} /> Country</label>
+                                            <div className="premium-input-wrapper">
+                                                <SearchableSelect
+                                                    options={(() => {
+                                                        const continentObj = (geoContinents || []).find(c => c.name === formData.continent_name);
+                                                        return (geoCountries || []).filter(c => !formData.continent_name || c.continent_ref == continentObj?.id).map(c => ({ id: c.name, name: c.name }));
+                                                    })()}
+                                                    value={formData.country_name || ''}
+                                                    onChange={(e) => setFormData({ ...formData, country_name: e.target.value, state_name: '', district_name: '', mandal_name: '', location: '', hamlet_name: '', latitude: '', longitude: '' })}
+                                                    disabled={!formData.continent_name}
+                                                    placeholder="Select Country..."
+                                                    icon={Globe}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {(['State', 'District', 'Mandal', 'Cluster'].includes(formData.geo_scope_level)) && (
+                                        <div className="form-group">
+                                            <label className="premium-label"><Navigation size={14} /> State / Province</label>
+                                            <div className="premium-input-wrapper">
+                                                <SearchableSelect
+                                                    options={(() => {
+                                                        const countryObj = (geoCountries || []).find(c => c.name === formData.country_name);
+                                                        return (geoStatesData || []).filter(s => !formData.country_name || s.country == countryObj?.id).map(s => ({ id: s.name, name: s.name }));
+                                                    })()}
+                                                    value={formData.state_name || ''}
+                                                    onChange={(e) => setFormData({ ...formData, state_name: e.target.value, district_name: '', mandal_name: '', location: '', hamlet_name: '', latitude: '', longitude: '' })}
+                                                    disabled={!formData.country_name}
+                                                    placeholder="Select State..."
+                                                    icon={Navigation}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {(['District', 'Mandal', 'Cluster'].includes(formData.geo_scope_level)) && (
+                                        <div className="form-group">
+                                            <label className="premium-label"><MapPin size={14} /> District</label>
+                                            <div className="premium-input-wrapper">
+                                                <SearchableSelect
+                                                    options={(() => {
+                                                        const stateObj = (geoStatesData || []).find(s => s.name === formData.state_name);
+                                                        return (geoDistrictsData || []).filter(d => !formData.state_name || d.state == stateObj?.id).map(d => ({ id: d.name, name: d.name }));
+                                                    })()}
+                                                    value={formData.district_name || ''}
+                                                    onChange={(e) => setFormData({ ...formData, district_name: e.target.value, mandal_name: '', location: '', hamlet_name: '', latitude: '', longitude: '' })}
+                                                    disabled={!formData.state_name}
+                                                    placeholder="Select District..."
+                                                    icon={MapPin}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {(['Mandal', 'Cluster'].includes(formData.geo_scope_level)) && (
+                                        <div className="form-group">
+                                            <label className="premium-label"><Map size={14} /> Mandal / Taluk</label>
+                                            <div className="premium-input-wrapper">
+                                                <SearchableSelect
+                                                    options={(() => {
+                                                        const districtObj = (geoDistrictsData || []).find(d => d.name === formData.district_name);
+                                                        return (geoMandals || []).filter(m => !formData.district_name || m.district == districtObj?.id).map(m => ({ id: m.name, name: m.name }));
+                                                    })()}
+                                                    value={formData.mandal_name || ''}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        setFormData({ ...formData, mandal_name: val, cluster: '', cluster_name: '', location: '', latitude: '', longitude: '' });
+                                                        if (val) checkGeoMandal(val, formData.district_name, formData.state_name);
+                                                    }}
+                                                    disabled={!formData.district_name}
+                                                    placeholder="Select Mandal..."
+                                                    icon={Map}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                            {/* Geospatial Coordinates & Map */}
+                            <div className="form-group full-width">
+                                <label className="premium-label"><MapPin size={14} /> Project Location Map</label>
+                                <div style={{ marginBottom: '1rem', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
+                                    <GeoMapPicker
+                                        latitude={formData.latitude}
+                                        longitude={formData.longitude}
+                                        onLocationSelect={(lat, lng) => setFormData({ ...formData, latitude: lat, longitude: lng })}
+                                        searchQuery={[
+                                            formData.cluster_name,
+                                            formData.mandal_name,
+                                            formData.district_name,
+                                            formData.state_name,
+                                            formData.country_name
+                                        ].filter(Boolean).join(', ')}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-group">
+                                <label className="premium-label"><MapPin size={14} /> Latitude</label>
+                                <div className="premium-input-wrapper">
+                                    <MapPin className="premium-input-icon" size={18} />
+                                    <input type="number" step="0.000000001" className="premium-input" placeholder="Latitude (e.g. 17.38)" value={formData.latitude || ''} onChange={(e) => setFormData({ ...formData, latitude: e.target.value })} />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><MapPin size={14} /> Longitude</label>
+                                <div className="premium-input-wrapper">
+                                    <MapPin className="premium-input-icon" size={18} />
+                                    <input type="number" step="0.000000001" className="premium-input" placeholder="Longitude (e.g. 78.48)" value={formData.longitude || ''} onChange={(e) => setFormData({ ...formData, longitude: e.target.value })} />
+                                </div>
+                            </div>
+                        </div>
+
+                        {(formData.geo_scope_level === 'Cluster') && formData.mandal_name && (
+                            <div className="fade-in" style={{ marginTop: '2rem' }}>
+                                <div className="form-group full-width">
+                                    <label className="premium-label"><Layers size={14} /> Settlement Cluster <span style={{ color: '#ef4444' }}>*</span></label>
+                                    <div className="premium-input-wrapper">
+                                        <SearchableSelect
+                                            options={(() => {
+                                                const mandalId = (geoMandals || []).find(m => m.name === formData.mandal_name)?.id;
+                                                return (geoClusters || []).filter(c => c.mandal == mandalId).map(c => ({ id: c.id, name: `${c.name} (${c.cluster_type_display})` }));
+                                            })()}
+                                            value={formData.cluster || ''}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                const clusterObj = (geoClusters || []).find(c => String(c.id) === String(val));
+                                                setFormData({ ...formData, cluster: val, cluster_name: clusterObj ? clusterObj.name : '' });
+                                            }}
+                                            placeholder="Select Cluster..."
+                                            icon={Layers}
+                                            required
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Organizational Alignment */}
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><Briefcase size={18} /> Organizational Assignment & Alignment</div>
+                        <div className="form-grid">
+                            <div className="form-group">
+                                <label className="premium-label"><Layers size={14} /> Targeted Organizational Level</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={orgLevels?.map(lvl => ({ id: lvl.id, name: `${lvl.name} (${lvl.level_code})` })) || []}
+                                        value={formData.assigned_level || ''}
+                                        onChange={(e) => setFormData({ ...formData, assigned_level: e.target.value || null, assigned_offices: [] })}
+                                        placeholder="Corporate / Global Scope"
+                                        icon={Layers}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Building2 size={14} /> Assigned Offices (Checklist)</label>
+                                <div style={{
+                                    maxHeight: '250px',
+                                    overflowY: 'auto',
+                                    padding: '1.25rem',
+                                    background: '#f8fafc',
+                                    borderRadius: '20px',
+                                    border: '1px solid #e2e8f0',
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                                    gap: '1rem'
+                                }}>
+                                    {(() => {
+                                        const filteredOffices = (offices || []).filter(o => !formData.assigned_level || o.level == formData.assigned_level);
+                                        return filteredOffices.length > 0 ? filteredOffices.map(off => (
+                                            <label key={off.id} style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '12px',
+                                                padding: '12px',
+                                                background: 'white',
+                                                border: (formData.assigned_offices || []).includes(off.id) ? '2px solid #fb923c' : '2px solid #f1f5f9',
+                                                borderRadius: '16px',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s',
+                                                boxShadow: (formData.assigned_offices || []).includes(off.id) ? '0 4px 6px -1px rgba(251, 146, 60, 0.1)' : 'none'
+                                            }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={(() => {
+                                                        const isExplicit = (formData.assigned_offices || []).map(String).includes(String(off.id));
+                                                        const master = facilityMasters?.find(m => String(m.id) === String(off.facility_master));
+                                                        // Check if this office's master is linked to THIS project (formData.id)
+                                                        const isImplicit = master && String(master.project) === String(formData.id);
+                                                        return isExplicit || isImplicit;
+                                                    })()}
+                                                    onChange={(e) => {
+                                                        const current = (formData.assigned_offices || []).map(String);
+                                                        const oid = String(off.id);
+                                                        let next;
+                                                        if (e.target.checked) {
+                                                            if (!current.includes(oid)) next = [...current, oid];
+                                                            else next = current;
+                                                        } else {
+                                                            next = current.filter(id => id !== oid);
+                                                        }
+                                                        setFormData({ ...formData, assigned_offices: next });
+                                                    }}
+                                                    style={{ accentColor: '#fb923c', width: '18px', height: '18px' }}
+                                                />
+                                                <div>
+                                                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e293b' }}>{off.name}</div>
+                                                    <div style={{ fontSize: '0.7rem', color: '#64748b' }}>{off.level_display || off.level_name}</div>
+                                                </div>
+                                            </label>
+                                        )) : (
+                                            <div style={{ gridColumn: '1 / -1', padding: '3rem', textAlign: 'center' }}>
+                                                <Building2 size={48} style={{ margin: '0 auto 1rem', opacity: 0.1 }} />
+                                                <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.9rem', fontWeight: 500 }}>No offices found for the selected level.</p>
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+        case 'Positions':
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+
+                    {/* Section 1: Core Identity & Designation */}
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><UserSquare2 size={18} /> Core Identity & Designation</div>
+                        <div className="form-grid">
+                            <div className="form-group">
+                                <label className="premium-label"><Edit size={14} /> Position Title (Display Name)</label>
+                                <div className="premium-input-wrapper">
+                                    <Edit className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value, 100, 'pos_name') })} placeholder="e.g. Senior Project Manager" required />
+                                </div>
+                                {validationErrors.pos_name && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <X size={12} /> {validationErrors.pos_name}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="form-group">
+                                <label className="premium-label"><Network size={14} /> Position Code</label>
+                                <div className="premium-input-wrapper">
+                                    <Network className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="e.g. SPM-104-AP" value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 16, 'pos_code') })} required />
+                                </div>
+                                {validationErrors.pos_code && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <X size={12} /> {validationErrors.pos_code}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="form-group">
+                                <label className="premium-label"><LayoutGrid size={14} /> Designation Rank / Level</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={(() => {
+                                            const sorted = [...(positionLevels || [])].sort((a, b) => (a.rank || 0) - (b.rank || 0));
+                                            return sorted.map(lvl => ({ id: lvl.id, name: `${lvl.name} (Rank: ${lvl.rank})` }));
+                                        })()}
+                                        value={formData.level || ''}
+                                        onChange={(e) => setFormData({ ...formData, level: e.target.value })}
+                                        placeholder="Select Level..."
+                                        icon={LayoutGrid}
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-group">
+                                <label className="premium-label"><Calendar size={14} /> Activation Date</label>
+                                <div className="premium-input-wrapper">
+                                    <Calendar className="premium-input-icon" size={18} />
+                                    <input type="date" className="premium-input" value={formData.start_date || ''} onChange={(e) => setFormData({ ...formData, start_date: e.target.value })} />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section 2: Organizational Context */}
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><Building2 size={18} /> Organizational Placement</div>
+                        <div className="form-grid">
+                            <div className="form-group">
+                                <label className="premium-label"><Layers size={14} /> Structural Tier (Office Level)</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={orgLevels?.map(l => ({ id: l.id, name: l.level_code ? `${l.level_code} - ${l.name}` : l.name })) || []}
+                                        value={formData._pos_level_filter || ''}
+                                        onChange={(e) => setFormData({ ...formData, _pos_level_filter: e.target.value, office: '', department: '', section: '' })}
+                                        placeholder="All Tiers (State/Circle/Dist)"
+                                        icon={Layers}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-group">
+                                <label className="premium-label"><Building2 size={14} /> Assign to Office / Unit</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={(() => {
+                                            const filteredOffices = (offices || []).filter(o => {
+                                                if (!formData._pos_level_filter) return true;
+                                                const officeLevelId = o.level_id || (typeof o.level === 'object' ? o.level?.id : o.level);
+                                                return String(officeLevelId) === String(formData._pos_level_filter);
+                                            });
+                                            return filteredOffices.map(o => ({ id: o.id, name: o.name }));
+                                        })()}
+                                        value={formData.office || ''}
+                                        onChange={(e) => {
+                                            const officeId = e.target.value;
+                                            const selectedOff = offices.find(o => o.id == officeId);
+                                            const masterRoles = selectedOff?.facility_master_details?.role_details || [];
+                                            setFormData({
+                                                ...formData,
+                                                office: officeId,
+                                                _pos_office_filter: officeId, // Sync filter
+                                                department: '',
+                                                section: '',
+                                                role: masterRoles.length === 1 ? masterRoles[0].id : ''
+                                            });
+                                        }}
+                                        disabled={!formData._pos_level_filter && !formData.id}
+                                        placeholder="Select Office..."
+                                        icon={Building2}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-group">
+                                <label className="premium-label"><Briefcase size={14} /> Department</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={departments.filter(d => !formData.office || d.office == formData.office).map(d => ({ id: d.id, name: `${d.name} (${d.project_name || 'General'})` }))}
+                                        value={formData.department || ''}
+                                        onChange={(e) => setFormData({ ...formData, department: e.target.value, section: '' })}
+                                        disabled={!formData.office}
+                                        placeholder="Select Department..."
+                                        icon={Briefcase}
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-group">
+                                <label className="premium-label"><Layers size={14} /> Section / Team</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={sections.filter(s => s.department == formData.department).map(s => ({ id: s.id, name: s.name }))}
+                                        value={formData.section || ''}
+                                        onChange={(e) => setFormData({ ...formData, section: e.target.value })}
+                                        disabled={!formData.department}
+                                        placeholder="None / General"
+                                        icon={Layers}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section 3: Job Specification (Functional Mapping) */}
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><ClipboardList size={18} /> Job Specification & Functional Mapping</div>
+                        <div className="form-grid">
+                            <div className="form-group">
+                                <label className="premium-label"><BarChart3 size={14} /> Job Family</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={jobFamilies?.map(jf => ({ id: jf.id, name: jf.name })) || []}
+                                        value={formData._pos_job_family_filter || ''}
+                                        onChange={(e) => setFormData({ ...formData, _pos_job_family_filter: e.target.value, _pos_role_type_filter: '', role: '', job: '' })}
+                                        placeholder="Select Family..."
+                                        icon={BarChart3}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-group">
+                                <label className="premium-label"><Settings size={14} /> Role Type</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={roleTypes.filter(rt => rt.job_family == formData._pos_job_family_filter).map(rt => ({ id: rt.id, name: rt.name }))}
+                                        value={formData._pos_role_type_filter || ''}
+                                        onChange={(e) => setFormData({ ...formData, _pos_role_type_filter: e.target.value, role: '', job: '' })}
+                                        disabled={!formData._pos_job_family_filter}
+                                        placeholder="Select Type..."
+                                        icon={Settings}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Users size={14} /> Role Name</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={(() => {
+                                            const selectedOffId = formData.office || formData._pos_office_filter;
+                                            const selectedOff = offices.find(o => o.id == selectedOffId);
+                                            const masterRoles = selectedOff?.facility_master_details?.role_details || [];
+                                            let filteredRoles = roles.filter(r => r.role_type == formData._pos_role_type_filter);
+                                            if (masterRoles.length > 0) {
+                                                const masterRoleIds = masterRoles.map(mr => mr.id);
+                                                filteredRoles = filteredRoles.filter(r => masterRoleIds.includes(r.id));
+                                            }
+                                            return filteredRoles.map(r => ({ id: r.id, name: r.name }));
+                                        })()}
+                                        value={formData.role || ''}
+                                        onChange={(e) => {
+                                            const selectedRole = roles.find(r => r.id == e.target.value);
+                                            setFormData({
+                                                ...formData,
+                                                role: e.target.value,
+                                                job: '', // Reset job when role changes
+                                                name: selectedRole ? selectedRole.name : formData.name
+                                            });
+                                        }}
+                                        placeholder="Select Role..."
+                                        icon={Users}
+                                        required
+                                        disabled={!formData._pos_role_type_filter}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Briefcase size={14} /> Job Profile (Specific Role)</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={jobs.filter(j => j.role == formData.role).map(j => ({ id: j.id, name: j.name }))}
+                                        value={formData.job || ''}
+                                        onChange={(e) => setFormData({ ...formData, job: e.target.value })}
+                                        placeholder="Select Job Profile..."
+                                        icon={Briefcase}
+                                        required
+                                        disabled={!formData.role}
+                                    />
+                                </div>
+                            </div>
+
+                            {formData.job && (
+                                <div className="form-group full-width">
+                                    <label className="premium-label"><ClipboardList size={14} /> Scope of Work (Tasks)</label>
+                                    <div style={{
+                                        padding: '1.25rem',
+                                        background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                                        borderRadius: '20px',
+                                        border: '1px solid #e2e8f0',
+                                        maxHeight: '200px',
+                                        overflowY: 'auto'
+                                    }}>
+                                        {(() => {
+                                            const jobTasks = tasks.filter(t => t.job == formData.job);
+                                            return jobTasks.length > 0 ? (
+                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.75rem' }}>
+                                                    {jobTasks.map((t) => (
+                                                        <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                                                            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--primary)', flexShrink: 0 }} />
+                                                            <span style={{ fontSize: '0.8rem', color: '#1e293b', fontWeight: 500 }}>{t.name}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div style={{ textAlign: 'center', color: '#94a3b8', fontStyle: 'italic', fontSize: '0.8rem', padding: '1rem' }}>
+                                                    No specific tasks defined for this job profile.
+                                                </div>
+                                            );
+                                        })()}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+
+                    {/* Reporting Hierarchy */}
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><Network size={18} /> Reporting Hierarchy</div>
+
+                        <div className="form-group full-width">
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                <label className="premium-label" style={{ margin: 0 }}><Users size={14} /> Multi-Reporting Lines (Reporting To)</label>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <SearchableSelect
+                                        options={orgLevels?.map(l => ({ id: l.id, name: l.level_code ? `${l.level_code} - ${l.name}` : l.name })) || []}
+                                        value={formData._rep_level_filter || ''}
+                                        onChange={(e) => setFormData({ ...formData, _rep_level_filter: e.target.value, _rep_office_filter: '', _rep_pos_level_filter: '' })}
+                                        placeholder="Office Level"
+                                        style={{ padding: '4px 10px', fontSize: '0.75rem', height: '32px', width: '140px', borderRadius: '8px' }}
+                                    />
+                                    <SearchableSelect
+                                        options={offices.filter(o => formData._rep_level_filter && o.level == formData._rep_level_filter).map(o => ({ id: o.id, name: o.name }))}
+                                        value={formData._rep_office_filter || ''}
+                                        onChange={(e) => setFormData({ ...formData, _rep_office_filter: e.target.value })}
+                                        disabled={!formData._rep_level_filter}
+                                        placeholder="Specific Office"
+                                        style={{ padding: '4px 10px', fontSize: '0.75rem', height: '32px', width: '150px', borderRadius: '8px' }}
+                                    />
+                                    <SearchableSelect
+                                        options={positionLevels?.map(l => ({ id: l.id, name: l.name })) || []}
+                                        value={formData._rep_pos_level_filter || ''}
+                                        onChange={(e) => setFormData({ ...formData, _rep_pos_level_filter: e.target.value })}
+                                        placeholder="Rank Filter"
+                                        style={{ padding: '4px 10px', fontSize: '0.75rem', height: '32px', width: '130px', borderRadius: '8px' }}
+                                    />
+                                </div>
+                            </div>
+
+                            <div style={{
+                                maxHeight: '300px',
+                                overflowY: 'auto',
+                                padding: '1.5rem',
+                                background: '#f8fafc',
+                                borderRadius: '20px',
+                                border: '1px solid #e2e8f0',
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                                gap: '1rem'
+                            }}>
+                                {getFilteredReportingPositions()
+                                    .map(p => (
+                                        <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                                            <input
+                                                type="checkbox"
+                                                value={p.id}
+                                                checked={(formData.reporting_to || []).map(id => Number(id)).includes(Number(p.id))}
+                                                onChange={(e) => {
+                                                    const currentIds = (formData.reporting_to || []).map(id => Number(id));
+                                                    const pid = Number(p.id);
+                                                    const newIds = e.target.checked
+                                                        ? [...currentIds, pid]
+                                                        : currentIds.filter(id => id !== pid);
+                                                    setFormData({ ...formData, reporting_to: newIds });
+                                                }}
+                                                style={{ width: '18px', height: '18px', accentColor: 'var(--primary)' }}
+                                            />
+                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                <span style={{ fontSize: '0.9rem', color: '#1e293b', fontWeight: 600 }}>{p.name}</span>
+                                                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{p.office_name} • {p.role_name}</span>
+                                            </div>
+                                        </label>
+                                    ))
+                                }
+                                {getFilteredReportingPositions().length === 0 && (
+                                    <div style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '0.85rem', padding: '1rem', gridColumn: '1/-1', textAlign: 'center' }}>
+                                        No reporting positions available for the selected filters.
+                                    </div>
+                                )}
+                            </div>
+                            <p className="form-help-text" style={{ marginTop: '0.75rem' }}>Select one or more positions that this position reports to (Matrix Reporting Support).</p>
+                        </div>
+                    </div>
+                </div >
+            );
+
+        case 'Position Assignments':
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><ArrowRightLeft size={18} /> Assignment Details</div>
+                        <div className="form-grid">
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Briefcase size={14} /> Which Position Are You Delegating?</label>
+                                <div className="premium-input-wrapper">
+                                    {(() => {
+                                        const currentUser = user || JSON.parse(localStorage.getItem('user') || 'null');
+                                        const myPositions = currentUser?.positions_details || [];
+                                        const isDisabled = myPositions.length === 1;
+
+                                        return (
+                                            <SearchableSelect
+                                                options={myPositions.map(p => ({ id: String(p.id), name: `${p.name} (${p.office_name})` }))}
+                                                value={formData.position || ''}
+                                                onChange={(e) => {
+                                                    const selectedPos = myPositions.find(p => p.id == e.target.value);
+                                                    setFormData({
+                                                        ...formData,
+                                                        position: e.target.value,
+                                                        assignee: '',
+                                                        _assignee_level_filter: 'SAME', // Default to same level
+                                                        _assignee_office_filter: selectedPos?.office_id ? String(selectedPos.office_id) : '',
+                                                        _selected_position_name: selectedPos?.name || '',
+                                                        _selected_position_office: selectedPos?.office_name || '',
+                                                        _selected_position_dept: selectedPos?.department_name || ''
+                                                    });
+                                                }}
+                                                placeholder="Select one of your positions"
+                                                icon={Briefcase}
+                                                disabled={isDisabled}
+                                            />
+                                        );
+                                    })()}
+                                </div>
+                                <p className="form-help-text">You can only delegate positions that you currently hold.</p>
+
+                                {formData.position && (
+                                    <div style={{
+                                        marginTop: '1rem',
+                                        padding: '12px 16px',
+                                        background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+                                        borderRadius: '12px',
+                                        border: '1px solid #bae6fd',
+                                        display: 'flex',
+                                        gap: '12px',
+                                        alignItems: 'center'
+                                    }}>
+                                        <Briefcase size={16} color="#0284c7" />
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ fontSize: '0.75rem', color: '#0369a1', fontWeight: 700, marginBottom: '4px' }}>
+                                                DELEGATING POSITION
+                                            </div>
+                                            <div style={{ fontSize: '0.9rem', color: '#0c4a6e', fontWeight: 600 }}>
+                                                {formData._selected_position_name}
+                                            </div>
+                                            <div style={{ fontSize: '0.75rem', color: '#0369a1', marginTop: '2px' }}>
+                                                {formData._selected_position_office} • {formData._selected_position_dept}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="form-group full-width">
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                    <label className="premium-label" style={{ margin: 0 }}><Users size={14} /> Assignee (Employee)</label>
+                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                        <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>Filtered by Position:</span>
+
+                                        <SearchableSelect
+                                            options={[
+                                                { id: '', name: 'All Levels' },
+                                                { id: 'ABOVE', name: 'One Level Above (Reporting Officers)' },
+                                                { id: 'SAME', name: 'Same Level (Colleagues)' },
+                                                { id: 'BELOW', name: 'One Level Below (Subordinates)' }
+                                            ]}
+                                            value={formData._assignee_level_filter || ''}
+                                            onChange={(e) => setFormData({ ...formData, _assignee_level_filter: e.target.value, assignee: '' })}
+                                            placeholder="All Levels"
+                                            style={{ padding: '4px 10px', fontSize: '0.75rem', height: '32px', width: '180px', borderRadius: '8px' }}
+                                        />
+
+                                        <SearchableSelect
+                                            options={offices?.map(o => ({ id: o.id, name: o.name })) || []}
+                                            value={formData._assignee_office_filter || ''}
+                                            onChange={(e) => setFormData({ ...formData, _assignee_office_filter: e.target.value, assignee: '' })}
+                                            placeholder="All Offices"
+                                            style={{ padding: '4px 10px', fontSize: '0.75rem', height: '32px', width: '120px', borderRadius: '8px' }}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={(() => {
+                                            const currentUser = user || JSON.parse(localStorage.getItem('user') || 'null');
+                                            const myEmpId = currentUser?.employee_profile_id;
+
+                                            // 1. Initial filter: exclude self
+                                            let filtered = (allEmployees || []).filter(emp => String(emp.id) !== String(myEmpId));
+
+                                            // 2. Get the selected position detail to know our current level/office
+                                            const positions = currentUser?.positions_details || [];
+                                            const selectedPosition = positions.find(p => String(p.id) === String(formData.position));
+
+                                            if (!selectedPosition) {
+                                                return []; // Return empty array if no position selected
+                                            }
+
+                                            const selectedLevelId = selectedPosition.level;
+                                            const currentLevelObj = positionLevels?.find(l => l.id == selectedLevelId);
+                                            const currentLevelRank = currentLevelObj?.rank || 0;
+
+                                            // 3. Apply Office filter
+                                            if (formData._assignee_office_filter) {
+                                                filtered = filtered.filter(emp =>
+                                                    emp.positions_details?.some(p => String(p.office_id || p.office) === String(formData._assignee_office_filter))
+                                                );
+                                            }
+
+                                            // 4. Apply Level filter: Hierarchical (Above/Same/Below)
+                                            if (formData._assignee_level_filter) {
+                                                filtered = filtered.filter(emp => {
+                                                    return (emp.positions_details || []).some(p => {
+                                                        const empLevelObj = positionLevels?.find(l => l.id == p.level);
+                                                        const empLevelRank = empLevelObj?.rank || 0;
+
+                                                        if (formData._assignee_level_filter === 'ABOVE') {
+                                                            return empLevelRank < currentLevelRank; // Lower rank number means higher position
+                                                        } else if (formData._assignee_level_filter === 'SAME') {
+                                                            return empLevelRank === currentLevelRank;
+                                                        } else if (formData._assignee_level_filter === 'BELOW') {
+                                                            return empLevelRank > currentLevelRank;
+                                                        }
+                                                        return false;
+                                                    });
+                                                });
+                                            }
+
+                                            return filtered.map(emp => ({ id: emp.id, name: `${emp.name} - ${emp.employee_code}` }));
+                                        })()}
+                                        value={formData.assignee || ''}
+                                        onChange={(e) => setFormData({ ...formData, assignee: e.target.value })}
+                                        placeholder="Select Assignee..."
+                                        icon={Users}
+                                        required
+                                    />
+                                </div>
+                                <p className="form-help-text">Select the person you want to assign this position to. Use filters above to narrow down the list.</p>
+                            </div>
+
+                            <div className="form-group">
+                                <label className="premium-label"><ShieldAlert size={14} /> Assignment Type</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={[
+                                            { id: 'NORMAL', name: 'Normal Assignment' },
+                                            { id: 'FORCED', name: 'Forced Assignment' }
+                                        ]}
+                                        value={formData.assignment_type || 'NORMAL'}
+                                        onChange={(e) => setFormData({ ...formData, assignment_type: e.target.value })}
+                                        placeholder="Select Type..."
+                                        icon={ShieldAlert}
+                                        required
+                                    />
+                                </div>
+                                <p className="form-help-text">Forced: Approvals required, but you lose reporting visibility.</p>
+                            </div>
+
+                            <div className="form-group">
+                                <label className="premium-label"><Calendar size={14} /> Expiry Date (Optional)</label>
+                                <div className="premium-input-wrapper">
+                                    <Calendar className="premium-input-icon" size={18} />
+                                    <input type="date" className="premium-input" value={formData.expires_at || ''} onChange={(e) => setFormData({ ...formData, expires_at: e.target.value })} min={new Date().toISOString().split('T')[0]} />
+                                </div>
+                            </div>
+
+                            <div className="form-group full-width">
+                                <label className="premium-label"><FileText size={14} /> Notes / Instructions</label>
+                                <div className="premium-input-wrapper">
+                                    <textarea
+                                        className="premium-input"
+                                        style={{ height: '80px', padding: '12px' }}
+                                        placeholder="Enter any instructions or reason for assignment..."
+                                        value={formData.notes || ''}
+                                        onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+        case 'Geo Territory':
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><Globe size={18} /> Territory Definition</div>
+                        <div className="form-grid">
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Edit size={14} /> Territory / Continent Name <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Globe className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="Enter Territory Name" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value.toUpperCase(), 100, 'geo_name') })} required />
+                                </div>
+                                {validationErrors.geo_name && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <X size={12} /> {validationErrors.geo_name}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+        case 'Countries':
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><Globe size={18} /> Country Definition</div>
+                        <div className="form-grid">
+                            <div className="form-group">
+                                <label className="premium-label"><Map size={14} /> Territory / Continent <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={geoContinents?.map(c => ({ id: c.id, name: c.name })) || []}
+                                        value={formData.continent_ref || ''}
+                                        onChange={(e) => setFormData({ ...formData, continent_ref: e.target.value })}
+                                        placeholder="Select Territory..."
+                                        icon={Map}
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Edit size={14} /> Country Name <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Globe className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="Enter Country Name" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value.toUpperCase(), 100, 'geo_name') })} required />
+                                </div>
+                                {validationErrors.geo_name && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <X size={12} /> {validationErrors.geo_name}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+        case 'States':
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><Map size={18} /> State Definition</div>
+                        <div className="form-grid">
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Map size={14} /> Filter by Territory</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={geoContinents?.map(c => ({ id: c.id, name: c.name })) || []}
+                                        value={formData._territory_filter || ''}
+                                        onChange={(e) => setFormData({ ...formData, _territory_filter: e.target.value, country: '' })}
+                                        placeholder="All Territories"
+                                        icon={Map}
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Globe size={14} /> Country <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={geoCountries?.filter(c => !formData._territory_filter || c.continent_ref == formData._territory_filter).map(c => ({ id: c.id, name: c.name })) || []}
+                                        value={formData.country || ''}
+                                        onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                                        placeholder="Select Country..."
+                                        icon={Globe}
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Edit size={14} /> State Name <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <MapPin className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="Enter State Name" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value.toUpperCase(), 100, 'geo_name') })} required />
+                                </div>
+                                {validationErrors.geo_name && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <X size={12} /> {validationErrors.geo_name}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+        case 'Districts':
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><MapPin size={18} /> District Definition</div>
+                        <div className="form-grid">
+                            <div className="form-group">
+                                <label className="premium-label"><Map size={14} /> Filter by Territory</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={geoContinents?.map(c => ({ id: c.id, name: c.name })) || []}
+                                        value={formData._territory_filter || ''}
+                                        onChange={(e) => setFormData({ ...formData, _territory_filter: e.target.value, _country_filter: '', state: '' })}
+                                        placeholder="All Territories"
+                                        icon={Map}
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Globe size={14} /> Filter by Country</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={geoCountries?.filter(c => !formData._territory_filter || c.continent_ref == formData._territory_filter).map(c => ({ id: c.id, name: c.name })) || []}
+                                        value={formData._country_filter || ''}
+                                        onChange={(e) => setFormData({ ...formData, _country_filter: e.target.value, state: '' })}
+                                        placeholder="All Countries"
+                                        icon={Globe}
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Map size={14} /> State</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={geoStatesData?.filter(s => !formData._country_filter || s.country == formData._country_filter).map(s => ({ id: s.id, name: s.name })) || []}
+                                        value={formData.state || ''}
+                                        onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                                        placeholder="Select State..."
+                                        icon={Map}
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Edit size={14} /> District Name <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <MapPin className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="Enter District Name" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value.toUpperCase(), 100, 'geo_name') })} required />
+                                </div>
+                                {validationErrors.geo_name && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <X size={12} /> {validationErrors.geo_name}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+        case 'Mandals':
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><Navigation size={18} /> Mandal Definition</div>
+                        <div className="form-grid">
+                            <div className="form-group">
+                                <label className="premium-label"><Map size={14} /> Filter by Territory</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={geoContinents?.map(c => ({ id: c.id, name: c.name })) || []}
+                                        value={formData._territory_filter || ''}
+                                        onChange={(e) => setFormData({ ...formData, _territory_filter: e.target.value, _country_filter: '', _state_filter: '', district: '' })}
+                                        placeholder="All Territories"
+                                        icon={Map}
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Globe size={14} /> Filter by Country</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={geoCountries?.filter(c => !formData._territory_filter || c.continent_ref == formData._territory_filter).map(c => ({ id: c.id, name: c.name })) || []}
+                                        value={formData._country_filter || ''}
+                                        onChange={(e) => setFormData({ ...formData, _country_filter: e.target.value, _state_filter: '', district: '' })}
+                                        placeholder="All Countries"
+                                        icon={Globe}
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Map size={14} /> Filter by State</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={geoStatesData?.filter(s => !formData._country_filter || s.country == formData._country_filter).map(s => ({ id: s.id, name: s.name })) || []}
+                                        value={formData._state_filter || ''}
+                                        onChange={(e) => setFormData({ ...formData, _state_filter: e.target.value, _district_filter: '', district: '' })}
+                                        placeholder="All States"
+                                        icon={Map}
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><MapPin size={14} /> District</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={geoDistrictsData?.filter(d => !formData._state_filter || d.state == formData._state_filter).map(d => ({ id: d.id, name: d.name })) || []}
+                                        value={formData.district || ''}
+                                        onChange={(e) => setFormData({ ...formData, district: e.target.value })}
+                                        placeholder="Select District..."
+                                        icon={MapPin}
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Edit size={14} /> Mandal Name <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Navigation className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="Enter Mandal Name" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value.toUpperCase(), 100, 'geo_name') })} required />
+                                </div>
+                                {validationErrors.geo_name && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <X size={12} /> {validationErrors.geo_name}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+
+
+        case 'Visiting Locations':
+        case 'Hotspots':
+        case 'Landmarks':
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><MapPin size={18} /> Location Definition</div>
+                        <div className="form-grid">
+                            <div className="form-group">
+                                <label className="premium-label"><Map size={14} /> Filter by Territory</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={geoContinents?.map(c => ({ id: c.id, name: c.name })) || []}
+                                        value={formData._territory_filter || ''}
+                                        onChange={(e) => setFormData({ ...formData, _territory_filter: e.target.value, _country_filter: '', _state_filter: '', _district_filter: '', _mandal_filter: '', cluster: '' })}
+                                        placeholder="All Territories"
+                                        icon={Map}
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Globe size={14} /> Filter by Country</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={(geoCountries || []).filter(c => c.continent_ref == formData._territory_filter).map(c => ({ id: c.id, name: c.name })) || []}
+                                        value={formData._country_filter || ''}
+                                        onChange={(e) => setFormData({ ...formData, _country_filter: e.target.value, _state_filter: '', _district_filter: '', _mandal_filter: '', cluster: '' })}
+                                        disabled={!formData._territory_filter}
+                                        placeholder={formData._territory_filter ? "All Countries" : "Select Territory First"}
+                                        icon={Globe}
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Map size={14} /> Filter by State</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={(geoStatesData || []).filter(s => s.country == formData._country_filter).map(s => ({ id: s.id, name: s.name })) || []}
+                                        value={formData._state_filter || ''}
+                                        onChange={(e) => setFormData({ ...formData, _state_filter: e.target.value, _district_filter: '', _mandal_filter: '', cluster: '' })}
+                                        disabled={!formData._country_filter}
+                                        placeholder={formData._country_filter ? "All States" : "Select Country First"}
+                                        icon={Map}
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><MapPin size={14} /> Filter by District</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={geoDistrictsData?.filter(d => String(d.state) === String(formData._state_filter))?.map(d => ({ id: d.id, name: d.name })) || []}
+                                        value={formData._district_filter || ''}
+                                        onChange={(e) => setFormData({ ...formData, _district_filter: e.target.value, _mandal_filter: '', cluster: '' })}
+                                        disabled={!formData._state_filter}
+                                        placeholder={formData._state_filter ? "All Districts" : "Select State First"}
+                                        icon={MapPin}
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Navigation size={14} /> Filter by Mandal</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={geoMandals?.filter(m => String(m.district) === String(formData._district_filter))?.map(m => ({ id: m.id, name: m.name })) || []}
+                                        value={formData._mandal_filter || ''}
+                                        onChange={(e) => setFormData({ ...formData, _mandal_filter: e.target.value, cluster: '' })}
+                                        disabled={!formData._district_filter}
+                                        placeholder={formData._district_filter ? "All Mandals" : "Select District First"}
+                                        icon={Navigation}
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Layers size={14} /> Cluster <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={geoClusters?.filter(c => String(c.mandal) === String(formData._mandal_filter))?.map(c => ({
+                                            id: String(c.id),
+                                            name: `${c.name} (${c.cluster_type_display})`
+                                        })) || []}
+                                        value={formData.cluster || ''}
+                                        onChange={(e) => setFormData({ ...formData, cluster: e.target.value })}
+                                        disabled={!formData._mandal_filter}
+                                        placeholder={formData._mandal_filter ? "Select Cluster" : "Select Mandal First"}
+                                        icon={Layers}
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Edit size={14} /> Location Name <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Edit className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="Enter Location Name (e.g. South Gate)" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value.toUpperCase(), 150, 'geo_name') })} required />
+                                </div>
+                                {validationErrors.geo_name && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <X size={12} /> {validationErrors.geo_name}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><MapPin size={14} /> Latitude <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <MapPin className="premium-input-icon" size={18} />
+                                    <input type="number" step="0.00000001" className="premium-input" placeholder="e.g. 17.3850" value={formData.latitude || ''} onChange={(e) => setFormData({ ...formData, latitude: e.target.value })} required />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><MapPin size={14} /> Longitude <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <MapPin className="premium-input-icon" size={18} />
+                                    <input type="number" step="0.00000001" className="premium-input" placeholder="e.g. 78.4867" value={formData.longitude || ''} onChange={(e) => setFormData({ ...formData, longitude: e.target.value })} required />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><User size={14} /> Contact Person</label>
+                                <div className="premium-input-wrapper">
+                                    <User className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="Enter Person Name" value={formData.contact_person || ''} onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })} />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Phone size={14} /> Contact Number</label>
+                                <div className="premium-input-wrapper">
+                                    <Phone className="premium-input-icon" size={18} />
+                                    <input
+                                        type="tel"
+                                        className="premium-input"
+                                        placeholder="Enter Contact Number"
+                                        value={formData.contact_number || ''}
+                                        onChange={(e) => setFormData({ ...formData, contact_number: validatePhone(e.target.value, 'geo_phone') })}
+                                    />
+                                </div>
+                                {validationErrors.geo_phone && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <X size={12} /> {validationErrors.geo_phone}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="premium-label"><MapPin size={14} /> Detailed Address</label>
+                                <div className="premium-input-wrapper">
+                                    <MapPin className="premium-input-icon" style={{ top: '1.5rem', transform: 'none' }} size={18} />
+                                    <textarea
+                                        className="premium-input"
+                                        rows="3"
+                                        placeholder="Street, Building, landmark details..."
+                                        value={formData.address || ''}
+                                        onChange={(e) => setFormData({ ...formData, address: validateAddress(e.target.value, 500, 'geo_address') })}
+                                        style={{ paddingLeft: '3rem', paddingTop: '1rem' }}
+                                    />
+                                </div>
+                                {validationErrors.geo_address && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.7rem', marginTop: '4px', marginLeft: '3rem' }}>
+                                        ⚠ {validationErrors.geo_address}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+        case 'Clusters':
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><Layers size={18} /> Cluster Definition</div>
+                        <div className="form-grid">
+                            <div className="form-group">
+                                <label className="premium-label"><Map size={14} /> Filter by Territory</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={geoContinents?.map(c => ({ id: c.id, name: c.name })) || []}
+                                        value={formData._territory_filter || ''}
+                                        onChange={(e) => setFormData({ ...formData, _territory_filter: e.target.value, _country_filter: '', _state_filter: '', _district_filter: '', mandal: '' })}
+                                        placeholder="All Territories"
+                                        icon={Map}
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Globe size={14} /> Filter by Country</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={geoCountries?.filter(c => String(c.continent_ref) === String(formData._territory_filter))?.map(c => ({ id: c.id, name: c.name })) || []}
+                                        value={formData._country_filter || ''}
+                                        onChange={(e) => setFormData({ ...formData, _country_filter: e.target.value, _state_filter: '', _district_filter: '', mandal: '' })}
+                                        disabled={!formData._territory_filter}
+                                        placeholder={formData._territory_filter ? "All Countries" : "Select Territory First"}
+                                        icon={Globe}
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Map size={14} /> Filter by State</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={geoStatesData?.filter(s => String(s.country) === String(formData._country_filter))?.map(s => ({ id: s.id, name: s.name })) || []}
+                                        value={formData._state_filter || ''}
+                                        onChange={(e) => setFormData({ ...formData, _state_filter: e.target.value, _district_filter: '', mandal: '' })}
+                                        disabled={!formData._country_filter}
+                                        placeholder={formData._country_filter ? "All States" : "Select Country First"}
+                                        icon={Map}
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><MapPin size={14} /> Filter by District</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={geoDistrictsData?.filter(d => String(d.state) === String(formData._state_filter))?.map(d => ({ id: d.id, name: d.name })) || []}
+                                        value={formData._district_filter || ''}
+                                        onChange={(e) => setFormData({ ...formData, _district_filter: e.target.value, mandal: '' })}
+                                        disabled={!formData._state_filter}
+                                        placeholder={formData._state_filter ? "All Districts" : "Select State First"}
+                                        icon={MapPin}
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Navigation size={14} /> Mandal <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={geoMandals?.filter(m => String(m.district) === String(formData._district_filter))?.map(m => ({ id: m.id, name: m.name })) || []}
+                                        value={formData.mandal || ''}
+                                        onChange={(e) => setFormData({ ...formData, mandal: e.target.value })}
+                                        disabled={!formData._district_filter}
+                                        placeholder={formData._district_filter ? "Select Mandal" : "Select District First"}
+                                        icon={Navigation}
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Settings size={14} /> Cluster Category <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={[
+                                            { id: 'METROPOLITAN', name: 'Metropolitan' },
+                                            { id: 'CITY', name: 'City' },
+                                            { id: 'TOWN', name: 'Town' },
+                                            { id: 'VILLAGE', name: 'Village' }
+                                        ]}
+                                        value={formData.cluster_type || ''}
+                                        onChange={(e) => setFormData({ ...formData, cluster_type: e.target.value })}
+                                        placeholder="Select Category..."
+                                        icon={Settings}
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Edit size={14} /> Cluster Name <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Edit className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="Enter Cluster Name" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value.toUpperCase(), 100, 'geo_name') })} required />
+                                </div>
+                                {validationErrors.geo_name && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <X size={12} /> {validationErrors.geo_name}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="form-group">
+                                <label className="premium-label"><FileDigit size={14} /> Cluster Code (Short Code) <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <FileDigit className="premium-input-icon" size={18} />
+                                    <input
+                                        type="text"
+                                        className="premium-input"
+                                        placeholder="Enter 3-char Code"
+                                        value={formData.code || ''}
+                                        onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value.toUpperCase().slice(0, 3), 3, 'geo_code') })}
+                                        required
+                                    />
+                                </div>
+                                {validationErrors.geo_code && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <X size={12} /> {validationErrors.geo_code}
+                                    </div>
+                                )}
+                                <p className="form-help-text">Exactly 3 characters (e.g. HYD, VJA). Only letters and numbers.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+
+
+        case 'Payslips':
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><Banknote size={18} /> Payroll Processing</div>
+                        <div className="form-grid">
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Users size={14} /> Employee</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={allEmployees?.map(e => ({ id: e.id, name: `${e.name} (${e.employee_code})` })) || []}
+                                        value={formData.employee || ''}
+                                        onChange={(e) => setFormData({ ...formData, employee: e.target.value })}
+                                        placeholder="Select Employee..."
+                                        icon={Users}
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Calendar size={14} /> Month</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map(m => ({ id: m, name: m }))}
+                                        value={formData.month || ''}
+                                        onChange={(e) => setFormData({ ...formData, month: e.target.value })}
+                                        placeholder="Select Month..."
+                                        icon={Calendar}
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Calendar size={14} /> Year</label>
+                                <div className="premium-input-wrapper">
+                                    <Calendar className="premium-input-icon" size={18} />
+                                    <input
+                                        type="number"
+                                        className="premium-input"
+                                        value={formData.year || new Date().getFullYear()}
+                                        onChange={(e) => {
+                                            const val = e.target.value.slice(0, 4);
+                                            if (val.length <= 4) setFormData({ ...formData, year: val });
+                                        }}
+                                        min={1900}
+                                        max={2099}
+                                        placeholder="YYYY"
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Wallet size={14} /> Net Salary</label>
+                                <div className="premium-input-wrapper">
+                                    <Wallet className="premium-input-icon" size={18} />
+                                    <input type="number" className="premium-input" value={formData.net_salary || ''} onChange={(e) => setFormData({ ...formData, net_salary: e.target.value })} required />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+        case 'Education': {
+            const targetEmployee = (allEmployees || []).find(e => e.id == formData?.employee) || selectedEmployee;
+
+            const academicTiers = [
+                { id: 'SSC', label: 'Secondary', sub: '10th / Foundation', icon: '10' },
+                { id: 'INTER', label: 'Sr. Secondary', sub: '12th / Inter', icon: '12' },
+                { id: 'ITI', label: 'Vocational', sub: 'ITI / Trade', icon: 'V' },
+                { id: 'DIPLOMA', label: 'Diploma', sub: 'Technical', icon: 'D' },
+                { id: 'UG', label: 'Undergraduate', sub: 'Bachelors', icon: 'UG' },
+                { id: 'PG', label: 'Postgraduate', sub: 'Masters', icon: 'PG' },
+                { id: 'PHD', label: 'Doctorate', sub: 'PhD / Research', icon: 'Dr' },
+                { id: 'OTHER', label: 'Other', sub: 'Certifications', icon: 'C' }
+            ];
+
+            const activeTierId = formData.level_type || 'UG';
+            const activeTier = academicTiers.find(t => t.id === activeTierId) || academicTiers[4];
+
+            const handleTierSelect = (tier) => {
+                setFormData({
+                    ...formData,
+                    level_type: tier.id,
+                    specialization: (tier.id === 'SSC' || tier.id === 'INTER') ? '' : formData.specialization
+                });
+            };
+
+            const getPh = (id) => {
+                if (id === 'SSC') return { q: 'Secondary School Certificate', i: 'School Name', b: 'Board', s: 'N/A' };
+                if (id === 'INTER') return { q: 'Intermediate / HSC', i: 'Junior College', b: 'Board', s: 'Stream' };
+                if (id === 'ITI') return { q: 'Trade Certificate', i: 'Industrial Training Inst.', b: 'NCVT / SCVT', s: 'Trade' };
+                if (id === 'DIPLOMA') return { q: 'Diploma in Engineering', i: 'Polytechnic', b: 'SBTET / Univ', s: 'Branch' };
+                if (id === 'UG') return { q: 'Degree', i: 'College Name', b: 'University', s: 'Major' };
+                if (id === 'PG') return { q: 'Master Degree', i: 'College / Dept', b: 'University', s: 'Specialization' };
+                if (id === 'PHD') return { q: 'Doctorate', i: 'University', b: 'University', s: 'Research Area' };
+                return { q: 'Qualification Name', i: 'Institution', b: 'Issuing Body', s: 'Specialization' };
+            };
+            const ph = getPh(activeTierId);
+
+            return (
+                <div className="education-form-container fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', paddingBottom: '1rem', borderBottom: '1px solid #f8fafc' }}>
+                        <div>
+                            <h2 style={{ fontSize: '1.8rem', fontWeight: 800, color: '#be185d', letterSpacing: '-1px', margin: 0 }}>Add New Education</h2>
+                        </div>
+                        {targetEmployee && (
+                            <div className="glass" style={{ padding: '0.5rem 1rem', borderRadius: '10px', background: 'white', border: '1px solid #e2e8f0', textAlign: 'right' }}>
+                                <div style={{ fontSize: '0.6rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Employee Context</div>
+                                <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b' }}>{targetEmployee.name}</div>
+                                <div style={{ fontSize: '0.7rem', color: '#be185d', fontWeight: 700 }}>{targetEmployee.employee_code}</div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Tier Selector */}
+                    <div style={{ display: 'flex', justifyContent: 'center', margin: '0 0 1rem 0', overflowX: 'auto', paddingBottom: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '15px', position: 'relative', padding: '0 20px' }}>
+                            {/* Connector Line */}
+                            <div style={{ position: 'absolute', top: '25px', left: '40px', right: '40px', height: '2px', background: '#e2e8f0', zIndex: 0 }}></div>
+
+                            {academicTiers.map((tier) => {
+                                const isActive = activeTierId === tier.id;
+                                return (
+                                    <div key={tier.id} onClick={() => handleTierSelect(tier)} style={{ cursor: 'pointer', position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', transition: 'all 0.3s ease', transform: isActive ? 'scale(1.05)' : 'scale(1)', minWidth: 80 }}>
+                                        <div style={{
+                                            width: '50px', height: '50px',
+                                            borderRadius: '16px',
+                                            background: isActive ? '#fff' : '#f8fafc',
+                                            border: isActive ? '2px solid #be185d' : '1px solid #e2e8f0',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            color: isActive ? '#be185d' : '#94a3b8',
+                                            fontWeight: 800, fontSize: '0.9rem',
+                                            boxShadow: isActive ? '0 10px 20px rgba(190, 24, 93, 0.15)' : 'none',
+                                            marginBottom: '8px',
+                                            transition: 'all 0.3s ease'
+                                        }}>
+                                            {tier.icon}
+                                        </div>
+                                        <div style={{ fontSize: '0.7rem', fontWeight: isActive ? 800 : 600, color: isActive ? '#1e293b' : '#94a3b8', textAlign: 'center', lineHeight: '1.2' }}>{tier.label}</div>
+                                        <div style={{ fontSize: '0.6rem', color: isActive ? '#be185d' : '#cbd5e1', fontWeight: 600, marginTop: 2 }}>{tier.sub}</div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+
+                    <div style={{ textAlign: 'center', fontSize: '0.7rem', color: '#94a3b8', fontStyle: 'italic', marginTop: '-1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                        <History size={12} />
+                        Sequential entry (SSC → Sr. Sec → Graduation) ensures full historical integrity.
+                    </div>
+
+                    {/* Form Layout */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: '2rem' }}>
+                        <div className="glass" style={{ padding: '2rem', border: '1px solid #fff7ed', background: '#fff' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '1.5rem', color: '#475569', fontWeight: 800, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                                <Sparkles size={16} color="#be185d" /> 2. Level-Specific Details
+                            </div>
+
+                            <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '1.2rem' }}>
+                                <div className="form-group full-width">
+                                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>Employee</label>
+                                    <SearchableSelect
+                                        options={allEmployees?.map(e => ({ id: e.id, name: e.name })) || []}
+                                        value={formData.employee || ''}
+                                        onChange={(e) => setFormData({ ...formData, employee: e.target.value })}
+                                        placeholder="Select Employee..."
+                                        disabled={!!targetEmployee}
+                                        required
+                                    />
+                                </div>
+
+                                <div className="form-group">
+                                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'flex', gap: '6px', alignItems: 'center' }}><GraduationCap size={14} /> Qualification Name / Degree</label>
+                                    <input type="text" className="form-input" style={{ fontSize: '1rem', fontWeight: 600, padding: '12px' }} value={formData.qualification || ''} onChange={(e) => setFormData({ ...formData, qualification: e.target.value })} placeholder={ph.q} required />
+                                </div>
+
+                                <div className="form-group">
+                                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'flex', gap: '6px', alignItems: 'center' }}><Building2 size={14} /> Board / Body</label>
+                                    <input type="text" className="form-input" style={{ fontSize: '0.9rem', padding: '12px' }} value={formData.board_university || ''} onChange={(e) => setFormData({ ...formData, board_university: e.target.value })} placeholder={ph.b} />
+                                </div>
+
+                                <div className="form-group">
+                                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'flex', gap: '6px', alignItems: 'center' }}><MapPin size={14} /> Institution / Institute</label>
+                                    <input type="text" className="form-input" style={{ fontSize: '0.9rem', padding: '12px' }} value={formData.institution || ''} onChange={(e) => setFormData({ ...formData, institution: e.target.value })} placeholder={ph.i} required />
+                                </div>
+
+                                <div className="form-group">
+                                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'flex', gap: '6px', alignItems: 'center' }}><Calendar size={14} /> Year of Passing</label>
+                                    <input
+                                        type="number"
+                                        className="form-input"
+                                        style={{ fontSize: '0.9rem', padding: '12px' }}
+                                        value={formData.year_of_passing || ''}
+                                        onChange={(e) => {
+                                            const val = e.target.value.slice(0, 4);
+                                            if (val.length <= 4) setFormData({ ...formData, year_of_passing: val });
+                                        }}
+                                        placeholder="YYYY"
+                                        min={1950}
+                                        max={2099}
+                                        required
+                                    />
+                                </div>
+
+                                <div className="form-group">
+                                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'flex', gap: '6px', alignItems: 'center' }}><BarChart3 size={14} /> Score / CGPA / %</label>
+                                    <input type="text" className="form-input" style={{ fontSize: '0.9rem', padding: '12px' }} value={formData.percentage || ''} onChange={(e) => setFormData({ ...formData, percentage: e.target.value })} placeholder="Final Result" />
+                                </div>
+
+                                {(activeTierId !== 'SSC' && activeTierId !== 'INTER') && (
+                                    <div className="form-group">
+                                        <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'flex', gap: '6px', alignItems: 'center' }}><TrendingUp size={14} /> Stream / Major / Specialization</label>
+                                        <input type="text" className="form-input" style={{ fontSize: '0.9rem', padding: '12px' }} value={formData.specialization || ''} onChange={(e) => setFormData({ ...formData, specialization: e.target.value })} placeholder={ph.s} />
+                                    </div>
+                                )}
+
+                                <div className="form-group full-width">
+                                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'flex', gap: '6px', alignItems: 'center' }}><Map size={14} /> Location</label>
+                                    <input type="text" className="form-input" style={{ fontSize: '0.9rem', padding: '12px' }} value={formData.location || ''} onChange={(e) => setFormData({ ...formData, location: e.target.value })} placeholder="Enter Location" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="glass" style={{ padding: '2rem', border: '1px solid #fff7ed', background: '#fff', display: 'flex', flexDirection: 'column' }}>
+                            <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#be185d', textTransform: 'uppercase', marginBottom: '1.5rem', display: 'flex', gap: '8px', alignItems: 'center' }}><FileText size={16} /> {activeTier.label} Certificate</label>
+                            <div className="file-upload-zone" style={{ flex: 1, minHeight: '300px', border: '2px dashed #cbd5e1', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', position: 'relative' }}>
+                                <input type="file" style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} onChange={(e) => setFormData({ ...formData, certificate: e.target.files[0] })} />
+                                <div style={{ textAlign: 'center' }}>
+                                    {formData.certificate ? (
+                                        <div className="fade-in">
+                                            <ShieldCheck size={40} color="#22c55e" style={{ marginBottom: 10 }} />
+                                            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#15803d' }}>{formData.certificate.name}</div>
+                                            <div style={{ fontSize: '0.65rem', color: '#166534' }}>Ready to Upload</div>
+                                        </div>
+                                    ) : (
+                                        <div className="fade-in">
+                                            <div style={{ width: 50, height: 50, background: '#e2e8f0', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px', color: '#64748b' }}><Plus size={24} /></div>
+                                            <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#475569' }}>Drag or Click to Upload</div>
+                                            <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: 4 }}>Supports PDF, JPG (Max 5MB)</div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        case 'Experience': {
+            const targetEmployee = (allEmployees || []).find(e => e.id == formData?.employee) || selectedEmployee;
+            return (
+                <div className="experience-form-container fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                    {/* Premium Header */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '0.5rem' }}>
+                        <div>
+                            <h2 style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--primary)', letterSpacing: '-1px', margin: 0 }}>Professional Tenure</h2>
+                            <p style={{ color: '#64748b', fontSize: '0.9rem', fontWeight: 500 }}>Document historical work experience and credentials</p>
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: '2rem' }}>
+                        {/* Information Details Area */}
+                        <div className="glass" style={{ padding: '2rem', border: '1px solid #fde6cd', background: 'rgba(255, 255, 255, 0.5)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '2rem', borderBottom: '1px solid #fde6cd', paddingBottom: '1rem' }}>
+                                <Sparkles size={18} color="var(--primary)" />
+                                <h3 style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: 800, color: '#475569' }}>
+                                    Experience Metadata
+                                </h3>
+                            </div>
+
+                            <div className="form-grid" style={{ gap: '1.25rem' }}>
+                                <div className="form-group full-width">
+                                    <label className="premium-label"><Users size={14} /> Employee Context</label>
+                                    {targetEmployee ? (
+                                        <div className="premium-input-wrapper" style={{ background: '#f8fafc', borderStyle: 'dashed' }}>
+                                            <Users className="premium-input-icon" size={18} />
+                                            <div style={{ padding: '0.75rem', fontWeight: 700, color: '#1e293b' }}>
+                                                {targetEmployee.name} <span style={{ color: '#64748b', fontWeight: 500 }}>({targetEmployee.employee_code})</span>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="premium-input-wrapper">
+                                            <SearchableSelect
+                                                options={allEmployees?.map(e => ({ id: e.id, name: `${e.name} (${e.employee_code})` })) || []}
+                                                value={formData.employee || ''}
+                                                onChange={(e) => setFormData({ ...formData, employee: e.target.value })}
+                                                placeholder="Select Employee..."
+                                                icon={Users}
+                                                required
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="form-group full-width">
+                                    <label className="premium-label"><Building2 size={14} /> Organization Name</label>
+                                    <div className="premium-input-wrapper">
+                                        <Building2 className="premium-input-icon" size={18} />
+                                        <input type="text" className="premium-input" placeholder="Enter Organization Name" value={formData.company || ''} onChange={(e) => setFormData({ ...formData, company: e.target.value })} required />
+                                    </div>
+                                </div>
+
+                                <div className="form-group full-width">
+                                    <label className="premium-label"><Briefcase size={14} /> Designation / Role</label>
+                                    <div className="premium-input-wrapper">
+                                        <Briefcase className="premium-input-icon" size={18} />
+                                        <input type="text" className="premium-input" placeholder="Enter Designation" value={formData.job_title || ''} onChange={(e) => setFormData({ ...formData, job_title: e.target.value })} required />
+                                    </div>
+                                </div>
+
+                                <div className="form-group">
+                                    <label className="premium-label"><Calendar size={14} /> Start Date</label>
+                                    <div className="premium-input-wrapper">
+                                        <Calendar className="premium-input-icon" size={18} />
+                                        <input type="date" className="premium-input" value={formData.from_date || ''} onChange={(e) => setFormData({ ...formData, from_date: e.target.value })} required />
+                                    </div>
+                                </div>
+
+                                <div className="form-group">
+                                    <label className="premium-label"><Calendar size={14} /> End Date</label>
+                                    <div className="premium-input-wrapper">
+                                        <Calendar className="premium-input-icon" size={18} />
+                                        <input type="date" className="premium-input" value={formData.to_date || ''} onChange={(e) => setFormData({ ...formData, to_date: e.target.value })} required />
+                                    </div>
+                                </div>
+
+                                <div className="form-group">
+                                    <label className="premium-label"><MapPin size={14} /> Work Location</label>
+                                    <div className="premium-input-wrapper">
+                                        <MapPin className="premium-input-icon" size={18} />
+                                        <input type="text" className="premium-input" placeholder="Enter Work Location" value={formData.location || ''} onChange={(e) => setFormData({ ...formData, location: e.target.value })} />
+                                    </div>
+                                </div>
+
+                                <div className="form-group">
+                                    <label className="premium-label"><Wallet size={14} /> Last Annual CTC</label>
+                                    <div className="premium-input-wrapper">
+                                        <Wallet className="premium-input-icon" size={18} />
+                                        <input type="text" className="premium-input" placeholder="Enter Last Annual CTC" value={formData.last_ctc || ''} onChange={(e) => setFormData({ ...formData, last_ctc: e.target.value })} />
+                                    </div>
+                                </div>
+
+                                <div className="form-group full-width">
+                                    <label className="premium-label"><FileText size={14} /> Core Responsibilities</label>
+                                    <div className="premium-input-wrapper" style={{ height: 'auto' }}>
+                                        <FileText className="premium-input-icon" size={18} style={{ marginTop: '0.75rem' }} />
+                                        <textarea className="premium-input" rows="3" placeholder="Summarize key projects and achievements..." value={formData.responsibilities || ''} onChange={(e) => setFormData({ ...formData, responsibilities: e.target.value })} style={{ paddingLeft: '3rem', paddingTop: '1rem' }} />
+                                    </div>
+                                </div>
+
+                                <div className="form-group full-width">
+                                    <label className="premium-label"><Navigation size={14} /> Reason for Exit</label>
+                                    <div className="premium-input-wrapper" style={{ height: 'auto' }}>
+                                        <Navigation className="premium-input-icon" size={18} style={{ marginTop: '0.75rem' }} />
+                                        <textarea className="premium-input" rows="2" placeholder="Brief reason for leaving..." value={formData.reason_for_leaving || ''} onChange={(e) => setFormData({ ...formData, reason_for_leaving: e.target.value })} style={{ paddingLeft: '3rem', paddingTop: '1rem' }} />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Upload Column */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                            <div className="glass" style={{ padding: '2rem', border: '1px solid #fde6cd', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                                <label style={{ color: 'var(--primary)', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <FileText size={16} /> Relieving / Exp. Letter
+                                </label>
+
+                                <div
+                                    className="file-upload-zone"
+                                    style={{
+                                        flex: 1,
+                                        position: 'relative',
+                                        minHeight: '200px',
+                                        border: '2px dashed #cbd5e1',
+                                        borderRadius: '20px',
+                                        background: formData.experience_letter ? '#f0fdf4' : '#f8fafc',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        transition: 'all 0.3s ease',
+                                        cursor: 'pointer',
+                                        overflow: 'hidden'
+                                    }}
+                                >
+                                    <input
+                                        type="file"
+                                        style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', zIndex: 10 }}
+                                        onChange={(e) => setFormData({ ...formData, experience_letter: e.target.files[0] })}
+                                    />
+                                    <div style={{ textAlign: 'center', padding: '1rem' }}>
+                                        {formData.experience_letter ? (
+                                            <div className="fade-in">
+                                                <div style={{ width: '60px', height: '60px', background: '#dcfce7', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
+                                                    <ShieldCheck size={32} color="#22c55e" />
+                                                </div>
+                                                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#166534', marginBottom: '4px' }}>{formData.experience_letter.name}</div>
+                                                <div style={{ fontSize: '0.7rem', color: '#22c55e', fontWeight: 600 }}>Certificate uploaded</div>
+                                            </div>
+                                        ) : (
+                                            <div style={{ color: '#94a3b8' }}>
+                                                <div style={{ width: '60px', height: '60px', background: '#f1f5f9', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
+                                                    <Plus size={32} />
+                                                </div>
+                                                <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#64748b' }}>Drag or Click to Upload</div>
+                                                <div style={{ fontSize: '0.7rem', marginTop: '8px' }}>Official letter or service certificate</div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                <div style={{ marginTop: '1rem', padding: '1rem', background: '#fff9f0', borderRadius: '12px', border: '1px solid #fde6cd' }}>
+                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', color: '#854d0e', fontSize: '0.7rem', fontWeight: 700 }}>
+                                        <ShieldCheck size={14} /> VERIFICATION NOTICE
+                                    </div>
+                                    <p style={{ fontSize: '0.65rem', color: '#a16207', marginTop: '4px', lineHeight: '1.4' }}>
+                                        Uploaded documents will be cross-verified by our compliance team. Ensure the file is clear and readable.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        case 'Employment History': {
+            const targetEmployee = (allEmployees || []).find(e => e.id == formData?.employee) || selectedEmployee;
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><History size={18} /> Internal Assignment Record</div>
+                        <div className="form-grid">
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Users size={14} /> Employee</label>
+                                {targetEmployee ? (
+                                    <div className="premium-input-wrapper" style={{ background: '#f8fafc', borderStyle: 'dashed' }}>
+                                        <Users className="premium-input-icon" size={18} />
+                                        <div style={{ padding: '0.75rem', fontWeight: 700, color: '#1e293b' }}>
+                                            {targetEmployee.name} <span style={{ color: '#64748b', fontWeight: 500 }}>({targetEmployee.employee_code})</span>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="premium-input-wrapper">
+                                        <SearchableSelect
+                                            options={allEmployees?.map(e => ({ id: e.id, name: `${e.name} (${e.employee_code})` })) || []}
+                                            value={formData.employee || ''}
+                                            onChange={(e) => setFormData({ ...formData, employee: e.target.value, _emp_hist_hydrated: false })}
+                                            placeholder="Select Employee..."
+                                            icon={Users}
+                                            required
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="premium-label">Position / Role</label>
+                                <div className="premium-input-wrapper">
+                                    <Briefcase className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" value={formData.position_name || ''} onChange={(e) => setFormData({ ...formData, position_name: capitalize(e.target.value) })} required />
+                                </div>
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="premium-label">Department</label>
+                                <div className="premium-input-wrapper">
+                                    <Building2 className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" value={formData.department_name || ''} onChange={(e) => setFormData({ ...formData, department_name: capitalize(e.target.value) })} required />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label">Date of Journey (Join)</label>
+                                <div className="premium-input-wrapper">
+                                    <Calendar className="premium-input-icon" size={18} />
+                                    <input type="date" className="premium-input" value={formData.date_of_join || ''} onChange={(e) => setFormData({ ...formData, date_of_join: e.target.value })} required />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label">Relieving Date (If applicable)</label>
+                                <div className="premium-input-wrapper">
+                                    <Calendar className="premium-input-icon" size={18} />
+                                    <input type="date" className="premium-input" value={formData.date_of_relieving || ''} onChange={(e) => setFormData({ ...formData, date_of_relieving: e.target.value })} />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label">Employee Type</label>
+                                <div className="premium-input-wrapper">
+                                    <Briefcase className="premium-input-icon" size={18} />
+                                    <SearchableSelect
+                                        options={[
+                                            { id: 'Permanent', name: 'Permanent' },
+                                            { id: 'Contract', name: 'Contract' },
+                                            { id: 'Probation', name: 'Probation' },
+                                            { id: 'Intern', name: 'Intern' }
+                                        ]}
+                                        value={formData.employee_type || 'Permanent'}
+                                        onChange={(e) => setFormData({ ...formData, employee_type: e.target.value })}
+                                        placeholder="Select Type..."
+                                        icon={Briefcase}
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label">Employment Type</label>
+                                <div className="premium-input-wrapper">
+                                    <Briefcase className="premium-input-icon" size={18} />
+                                    <SearchableSelect
+                                        options={[
+                                            { id: 'Full-time', name: 'Full-time' },
+                                            { id: 'Part-time', name: 'Part-time' }
+                                        ]}
+                                        value={formData.employment_type || 'Full-time'}
+                                        onChange={(e) => setFormData({ ...formData, employment_type: e.target.value })}
+                                        placeholder="Select Type..."
+                                        icon={Briefcase}
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label">Status</label>
+                                <div className="premium-input-wrapper">
+                                    <TrendingUp className="premium-input-icon" size={18} />
+                                    <SearchableSelect
+                                        options={[
+                                            { id: 'Active', name: 'Active' },
+                                            { id: 'Transferred', name: 'Transferred' },
+                                            { id: 'Promoted', name: 'Promoted' },
+                                            { id: 'Resigned', name: 'Resigned' }
+                                        ]}
+                                        value={formData.status || 'Active'}
+                                        onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                                        placeholder="Select Status..."
+                                        icon={TrendingUp}
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="premium-label">Reporting Manager Name</label>
+                                <div className="premium-input-wrapper">
+                                    <User className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" value={formData.reporting_to_name || ''} onChange={(e) => setFormData({ ...formData, reporting_to_name: e.target.value })} />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        case 'Bank Details': {
+            const targetEmployee = (allEmployees || []).find(e => e.id == formData?.employee) || selectedEmployee;
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><Wallet size={18} /> Financial Identity & Payments</div>
+                        <div className="form-grid">
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Users size={14} /> Linked Employee Profile <span style={{ color: '#ef4444' }}>*</span></label>
+                                {targetEmployee ? (
+                                    <div className="premium-input-wrapper" style={{ background: '#f8fafc', borderStyle: 'dashed' }}>
+                                        <Users className="premium-input-icon" size={18} />
+                                        <div style={{ padding: '0.75rem', fontWeight: 700, color: '#1e293b' }}>
+                                            {targetEmployee.name} <span style={{ color: '#64748b', fontWeight: 500 }}>({targetEmployee.employee_code})</span>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="premium-input-wrapper">
+                                        <SearchableSelect
+                                            options={allEmployees?.map(e => ({ id: e.id, name: `${e.name} (${e.employee_code})` })) || []}
+                                            value={formData.employee || ''}
+                                            onChange={(e) => setFormData({ ...formData, employee: e.target.value })}
+                                            placeholder="Select Employee..."
+                                            icon={Users}
+                                            required
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Building size={14} /> Bank Name <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Building className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="e.g. HDFC Bank" value={formData.bank_name || ''} onChange={(e) => setFormData({ ...formData, bank_name: validateAlphaNumeric(e.target.value, 100, 'bank_name') })} required />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><User size={14} /> Account Holder Name</label>
+                                <div className="premium-input-wrapper">
+                                    <User className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="Name as per Passbook" value={formData.account_holder_name || ''} onChange={(e) => setFormData({ ...formData, account_holder_name: validateAlpha(e.target.value, 100, 'acc_holder') })} />
+                                </div>
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="premium-label"><CreditCard size={14} /> Account Number <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <CreditCard className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="Enter Full Account Number" value={formData.account_number || ''} onChange={(e) => setFormData({ ...formData, account_number: validateNumbers(e.target.value, 20, 'acc_no') })} required />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><FileDigit size={14} /> IFSC Code <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <FileDigit className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="11-char IFSC" value={formData.ifsc_code || ''} onChange={(e) => setFormData({ ...formData, ifsc_code: validateCode(e.target.value, 11, 'ifsc').toUpperCase() })} required />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><MapPin size={14} /> Branch Name</label>
+                                <div className="premium-input-wrapper">
+                                    <MapPin className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="Branch location" value={formData.branch_name || ''} onChange={(e) => setFormData({ ...formData, branch_name: e.target.value })} />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Shield size={14} /> Account Type</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={[
+                                            { id: 'Savings', name: 'Savings Account' },
+                                            { id: 'Current', name: 'Current Account' },
+                                            { id: 'Salary', name: 'Salary Account' }
+                                        ]}
+                                        value={formData.account_type || 'Savings'}
+                                        onChange={(e) => setFormData({ ...formData, account_type: e.target.value })}
+                                        icon={Shield}
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><FileText size={14} /> PAN Number <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <FileText className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="10-char PAN" value={formData.pan_number || ''} onChange={(e) => setFormData({ ...formData, pan_number: validateAlphaNumeric(e.target.value, 10, 'pan').toUpperCase() })} required />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><FileDigit size={14} /> Aadhaar Number <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <FileDigit className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="12-digit Aadhaar" value={formData.aadhaar_number || ''} onChange={(e) => setFormData({ ...formData, aadhaar_number: validateNumbers(e.target.value, 12, 'aadhaar') })} required />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        case 'Salary Details': {
+            const targetEmployee = (allEmployees || []).find(e => e.id == formData?.employee) || selectedEmployee;
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><Banknote size={18} /> Compensation & Payroll Structure</div>
+                        <div className="form-grid">
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Users size={14} /> Employee Context <span style={{ color: '#ef4444' }}>*</span></label>
+                                {targetEmployee ? (
+                                    <div className="premium-input-wrapper" style={{ background: '#f8fafc', borderStyle: 'dashed' }}>
+                                        <Users className="premium-input-icon" size={18} />
+                                        <div style={{ padding: '0.75rem', fontWeight: 700, color: '#1e293b' }}>
+                                            {targetEmployee.name} <span style={{ color: '#64748b', fontWeight: 500 }}>({targetEmployee.employee_code})</span>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="premium-input-wrapper">
+                                        <SearchableSelect
+                                            options={allEmployees?.map(e => ({ id: e.id, name: `${e.name} (${e.employee_code})` })) || []}
+                                            value={formData.employee || ''}
+                                            onChange={(e) => setFormData({ ...formData, employee: e.target.value })}
+                                            placeholder="Select Employee..."
+                                            icon={Users}
+                                            required
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Wallet size={14} /> Basic Salary <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Wallet className="premium-input-icon" size={18} />
+                                    <input type="number" className="premium-input" placeholder="Monthly Basic" value={formData.basic_salary || ''} onChange={(e) => setFormData({ ...formData, basic_salary: e.target.value })} required />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Home size={14} /> House Rent Allowance (HRA)</label>
+                                <div className="premium-input-wrapper">
+                                    <Home className="premium-input-icon" size={18} />
+                                    <input type="number" className="premium-input" placeholder="Monthly HRA" value={formData.hra || ''} onChange={(e) => setFormData({ ...formData, hra: e.target.value })} />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Car size={14} /> Conveyance Allowance</label>
+                                <div className="premium-input-wrapper">
+                                    <Car className="premium-input-icon" size={18} />
+                                    <input type="number" className="premium-input" placeholder="Travel Allowance" value={formData.conveyance_allowance || ''} onChange={(e) => setFormData({ ...formData, conveyance_allowance: e.target.value })} />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Heart size={14} /> Medical Allowance</label>
+                                <div className="premium-input-wrapper">
+                                    <Heart className="premium-input-icon" size={18} />
+                                    <input type="number" className="premium-input" placeholder="Health Allowance" value={formData.medical_allowance || ''} onChange={(e) => setFormData({ ...formData, medical_allowance: e.target.value })} />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Gift size={14} /> Special Allowance</label>
+                                <div className="premium-input-wrapper">
+                                    <Gift className="premium-input-icon" size={18} />
+                                    <input type="number" className="premium-input" placeholder="Special Pay" value={formData.special_allowance || ''} onChange={(e) => setFormData({ ...formData, special_allowance: e.target.value })} />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Layers size={14} /> Other Allowances</label>
+                                <div className="premium-input-wrapper">
+                                    <Layers className="premium-input-icon" size={18} />
+                                    <input type="number" className="premium-input" placeholder="Misc Allowances" value={formData.other_allowances || ''} onChange={(e) => setFormData({ ...formData, other_allowances: e.target.value })} />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        case 'EPFO Details': {
+            const targetEmployee = (allEmployees || []).find(e => e.id == formData?.employee) || selectedEmployee;
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><FileDigit size={18} /> Statutory & Social Security Identity</div>
+                        <div className="form-grid">
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Users size={14} /> Employee Profile <span style={{ color: '#ef4444' }}>*</span></label>
+                                {targetEmployee ? (
+                                    <div className="premium-input-wrapper" style={{ background: '#f8fafc', borderStyle: 'dashed' }}>
+                                        <Users className="premium-input-icon" size={18} />
+                                        <div style={{ padding: '0.75rem', fontWeight: 700, color: '#1e293b' }}>
+                                            {targetEmployee.name} <span style={{ color: '#64748b', fontWeight: 500 }}>({targetEmployee.employee_code})</span>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="premium-input-wrapper">
+                                        <SearchableSelect
+                                            options={allEmployees?.map(e => ({ id: e.id, name: `${e.name} (${e.employee_code})` })) || []}
+                                            value={formData.employee || ''}
+                                            onChange={(e) => setFormData({ ...formData, employee: e.target.value })}
+                                            placeholder="Select Employee..."
+                                            icon={Users}
+                                            required
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="premium-label"><FileDigit size={14} /> Universal Account Number (UAN) <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <FileDigit className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="12-digit UAN" value={formData.uan_number || ''} onChange={(e) => setFormData({ ...formData, uan_number: validateNumbers(e.target.value, 12, 'uan') })} required />
+                                </div>
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Briefcase size={14} /> EPFO Member ID</label>
+                                <div className="premium-input-wrapper">
+                                    <Briefcase className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="Enter Member ID" value={formData.epfo_member_id || ''} onChange={(e) => setFormData({ ...formData, epfo_member_id: validateCode(e.target.value, 22, 'epfo').toUpperCase() })} />
+                                </div>
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Shield size={14} /> ESIC Number</label>
+                                <div className="premium-input-wrapper">
+                                    <Shield className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="17-digit ESIC" value={formData.esic_number || ''} onChange={(e) => setFormData({ ...formData, esic_number: validateNumbers(e.target.value, 17, 'esic') })} />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Calendar size={14} /> PF Joining Date</label>
+                                <div className="premium-input-wrapper">
+                                    <Calendar className="premium-input-icon" size={18} />
+                                    <input type="date" className="premium-input" value={formData.pf_joining_date || ''} onChange={(e) => setFormData({ ...formData, pf_joining_date: e.target.value })} />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><UserPlus size={14} /> Primary Nominee Name</label>
+                                <div className="premium-input-wrapper">
+                                    <UserPlus className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="Nominee full name" value={formData.nominee_name || ''} onChange={(e) => setFormData({ ...formData, nominee_name: validateAlpha(e.target.value, 100, 'nominee') })} />
+                                </div>
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Heart size={14} /> Nominee Relationship</label>
+                                <div className="premium-input-wrapper">
+                                    <Heart className="premium-input-icon" size={18} />
+                                    <input type="text" className="premium-input" placeholder="e.g. Spouse, Father, Mother" value={formData.nominee_relationship || ''} onChange={(e) => setFormData({ ...formData, nominee_relationship: validateAlpha(e.target.value, 50, 'relation') })} />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        case 'Health Details': {
+            const targetEmployee = (allEmployees || []).find(e => e.id == formData?.employee) || selectedEmployee;
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                    <div className="premium-form-section">
+                        <div className="form-section-title" style={{ marginBottom: '2rem' }}><ShieldCheck size={18} /> Employee Health & Emergency Context</div>
+                        <div className="form-grid">
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Users size={14} /> Employee Context <span style={{ color: '#ef4444' }}>*</span></label>
+                                {targetEmployee ? (
+                                    <div className="premium-input-wrapper" style={{ background: '#f8fafc', borderStyle: 'dashed' }}>
+                                        <Users className="premium-input-icon" size={18} />
+                                        <div style={{ padding: '0.75rem', fontWeight: 700, color: '#1e293b' }}>
+                                            {targetEmployee.name} <span style={{ color: '#64748b', fontWeight: 500 }}>({targetEmployee.employee_code})</span>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="premium-input-wrapper">
+                                        <SearchableSelect
+                                            options={allEmployees?.map(e => ({ id: e.id, name: `${e.name} (${e.employee_code})` })) || []}
+                                            value={formData.employee || ''}
+                                            onChange={(e) => setFormData({ ...formData, employee: e.target.value })}
+                                            placeholder="Select Employee..."
+                                            icon={Users}
+                                            required
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Activity size={14} /> Blood Group</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(bg => ({ id: bg, name: bg }))}
+                                        value={formData.blood_group || ''}
+                                        onChange={(e) => setFormData({ ...formData, blood_group: e.target.value })}
+                                        placeholder="Select Group..."
+                                        icon={Activity}
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Activity size={14} /> Physical Disability (if any)</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={[
+                                            { id: 'None', name: 'No Disability' },
+                                            { id: 'Visual', name: 'Visual Impairment' },
+                                            { id: 'Hearing', name: 'Hearing Impairment' },
+                                            { id: 'Locomotor', name: 'Locomotor Disability' },
+                                            { id: 'Other', name: 'Other' }
+                                        ]}
+                                        value={formData.physical_disability || 'None'}
+                                        onChange={(e) => setFormData({ ...formData, physical_disability: e.target.value })}
+                                        icon={ShieldCheck}
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Shield size={14} /> Allergies & Medical Conditions</label>
+                                <div className="premium-input-wrapper" style={{ height: 'auto' }}>
+                                    <Shield className="premium-input-icon" size={18} style={{ marginTop: '0.75rem' }} />
+                                    <textarea className="premium-input" rows="2" placeholder="List any chronic conditions or allergies..." value={formData.allergies || ''} onChange={(e) => setFormData({ ...formData, allergies: e.target.value })} style={{ paddingLeft: '3rem', paddingTop: '1rem' }} />
+                                </div>
+                            </div>
+                            <div className="form-group full-width">
+                                <label className="premium-label"><Phone size={14} /> Emergency Contact Name <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <User size={18} className="premium-input-icon" />
+                                    <input type="text" className="premium-input" placeholder="Full name of emergency contact" value={formData.emergency_contact_name || ''} onChange={(e) => setFormData({ ...formData, emergency_contact_name: validateAlpha(e.target.value, 100, 'emer_name') })} required />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Briefcase size={14} /> Relation <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={[
+                                            { id: 'Spouse', name: 'Spouse' },
+                                            { id: 'Father', name: 'Father' },
+                                            { id: 'Mother', name: 'Mother' },
+                                            { id: 'Sibling', name: 'Sibling' },
+                                            { id: 'Friend', name: 'Friend' },
+                                            { id: 'Other', name: 'Other' }
+                                        ]}
+                                        value={formData.emergency_contact_relation || ''}
+                                        onChange={(e) => setFormData({ ...formData, emergency_contact_relation: e.target.value })}
+                                        placeholder="Select Relation..."
+                                        icon={Briefcase}
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="premium-label"><Phone size={14} /> Emergency Phone <span style={{ color: '#ef4444' }}>*</span></label>
+                                <div className="premium-input-wrapper">
+                                    <Phone className="premium-input-icon" size={18} />
+                                    <input type="tel" className="premium-input" placeholder="10-digit phone number" value={formData.emergency_contact_phone || ''} onChange={(e) => setFormData({ ...formData, emergency_contact_phone: validatePhone(e.target.value, 10, 'emer_phone') })} required />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        case 'Task URLs':
+        case 'Task URL Mapping':
+            return (
+                <div style={{ padding: '2rem', textAlign: 'center' }}>
+                    Configuring <strong>Task Access</strong> for {formData.task}
+                </div>
+            );
+
+        default:
+            return (
+                <div style={{ padding: '2rem', textAlign: 'center' }}>
+                    Form for <strong>{modalType}</strong> is coming soon.
+                </div>
+            );
+    }
+};
+
+export default ModalForm;
