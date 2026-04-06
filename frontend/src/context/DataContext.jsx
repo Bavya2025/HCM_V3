@@ -417,6 +417,24 @@ export const DataProvider = ({ children }) => {
                     const res = await api.get('users/me');
                     if (res && (res.id || res.user?.id)) {
                         const userData = res.user || res;
+
+                        // Enforce multi-tab constraint immediately on startup for duplicated tabs
+                        const sessionKey = `active_session_${userData.id}`;
+                        const activeSession = JSON.parse(localStorage.getItem(sessionKey));
+                        
+                        if (activeSession && activeSession.tabId !== tabId && (Date.now() - activeSession.lastSeen < 15000)) {
+                            console.warn("Attempted to open a duplicate tab, blocking...");
+                            sessionStorage.removeItem('authToken');
+                            localStorage.removeItem('user');
+                            setIsAuthenticated(false);
+                            setUser(null);
+                            setError('User already logged in in another tab. Please close other tabs first.');
+                            return; 
+                        }
+
+                        // Claim the session for this valid mount
+                        localStorage.setItem(sessionKey, JSON.stringify({ tabId, lastSeen: Date.now() }));
+
                         setIsAuthenticated(true);
                         setUser(userData);
                         localStorage.setItem('user', JSON.stringify(userData));
@@ -472,8 +490,17 @@ export const DataProvider = ({ children }) => {
 
     const login = async (username, password) => {
         try {
-            const res = await api.post('auth/login', { username, password });
+            // Using test-login to verify routing
+            const res = await api.post('test-login', { username, password });
             if (res.token) {
+                // Check BEFORE committing the token to prevent the refresh-bypass
+                const sessionKey = `active_session_${res.user.id}`;
+                const activeSession = JSON.parse(localStorage.getItem(sessionKey));
+
+                if (activeSession && activeSession.tabId !== tabId && (Date.now() - activeSession.lastSeen < 15000)) {
+                    throw new Error('User already logged in in another tab. Please close other tabs first.');
+                }
+
                 // Store token immediately as it's needed for calls
                 sessionStorage.setItem('authToken', res.token);
                 if (res.login_hit_id) {
@@ -488,14 +515,7 @@ export const DataProvider = ({ children }) => {
                     return { requiresPasswordChange: true };
                 }
 
-                // Before committing login, check for other active tabs for THIS user
-                const sessionKey = `active_session_${res.user.id}`;
-                const activeSession = JSON.parse(localStorage.getItem(sessionKey));
-
-                if (activeSession && activeSession.tabId !== tabId && (Date.now() - activeSession.lastSeen < 15000)) {
-                    throw new Error('User already logged in in another tab. Please close other tabs first.');
-                }
-
+                // Record active session for cross-tab logout syncing
                 localStorage.setItem(sessionKey, JSON.stringify({ tabId, lastSeen: Date.now() }));
 
                 setIsAuthenticated(true);
@@ -769,7 +789,7 @@ export const DataProvider = ({ children }) => {
         const currentPath = pathParts[0] || 'dashboard';
 
         // High-vis log for user to see the app is responding to clicks
-        console.log(`%c[Navigation] ðŸ‘‰ Transitioning to: ${id.toUpperCase()}`, 'color: #be185d; font-weight: bold; background: #fff1f2; padding: 2px 5px; border-radius: 4px;');
+        console.log(`%c[Navigation] 👉 Transitioning to: ${id.toUpperCase()}`, 'color: #be185d; font-weight: bold; background: #fff1f2; padding: 2px 5px; border-radius: 4px;');
 
         // BOUNCE PROTECTION: If already on the base path of this section, ignore double-taps
         // If on a sub-page (edit/view), navigate back but don't clear everything
@@ -780,10 +800,10 @@ export const DataProvider = ({ children }) => {
             return;
         }
 
-        // PERFORMANCE: âš¡ INSTANT LOAD pattern
+        // PERFORMANCE: ⚡ INSTANT LOAD pattern
         const cachedData = pageCache.current.get(id);
         if (cachedData && Array.isArray(cachedData) && cachedData.length > 0) {
-            console.log(`%c[InstantLoad] âš¡ Showing cached data for: ${id}`, 'color: #0d9488; font-weight: bold;');
+            console.log(`%c[InstantLoad] ⚡ Showing cached data for: ${id}`, 'color: #0d9488; font-weight: bold;');
             setData(cachedData);
             setLoading(false);
         } else {
@@ -847,10 +867,11 @@ export const DataProvider = ({ children }) => {
                             else if (key === 'jobFamily') paramKey = 'job_family';
                             else if (key === 'roleType') paramKey = 'role_type';
                             else if (key === 'clusterType') paramKey = 'cluster_type';
-                            else if (key === 'state') paramKey = 'state';
-                            else if (key === 'district') paramKey = 'district';
-                            else if (key === 'mandal') paramKey = 'mandal';
-                            else if (key === 'office') paramKey = 'office';
+                            else if (key === 'state') paramKey = isNaN(val) ? 'state_name' : 'state';
+                            else if (key === 'district') paramKey = isNaN(val) ? 'district_name' : 'district';
+                            else if (key === 'mandal') paramKey = isNaN(val) ? 'mandal_name' : 'mandal';
+                            else if (key === 'country') paramKey = isNaN(val) ? 'country_name' : 'country';
+                            else if (key === 'office') paramKey = (requestSection === 'offices') ? 'id' : 'office';
                             else if (key === 'department') paramKey = 'department';
                             else if (key === 'section') paramKey = 'section';
                             else if (key === 'role') paramKey = 'role_id';
@@ -872,7 +893,7 @@ export const DataProvider = ({ children }) => {
                 // --- DEDUPLICATION LOGIC ---
                 // Safe re-implementation with error handling for secondary consumers
                 if (activeRequests.current.has(url)) {
-                    console.log(`[DataDedup] âš¡ Reusing in-flight request for: ${url}`);
+                    console.log(`[DataDedup] ⚡ Reusing in-flight request for: ${url}`);
                     // Catch allows secondary callers to safely ignore errors (primary caller handles reporting)
                     return activeRequests.current.get(url).catch(() => null);
                 }
@@ -1061,10 +1082,10 @@ export const DataProvider = ({ children }) => {
                 return;
             }
 
-            // âš¡ PERFORMANCE OPTIMIZATION: Progressive Loading Strategy
+            // ⚡ PERFORMANCE OPTIMIZATION: Progressive Loading Strategy
             // Load data in 3 waves to make the app feel instant while loading everything
 
-            console.log('ðŸš€ [Performance] Wave 1: Loading CRITICAL data (navigation, permissions)...');
+            console.log('🚀 [Performance] Wave 1: Loading CRITICAL data (navigation, permissions)...');
 
             // WAVE 1: CRITICAL - Must load immediately (blocks nothing)
             const wave1 = await Promise.all([
@@ -1098,15 +1119,15 @@ export const DataProvider = ({ children }) => {
             pageCache.current.set('facility-masters', universalSort(facilityMastersData));
             pageCache.current.set('organization-levels', levelSort(orgLevelsData));
 
-            console.log('âœ… [Performance] Wave 1 complete. App is now interactive!');
+            console.log('✅ [Performance] Wave 1 complete. App is now interactive!');
 
             // WAVE 2: IMPORTANT - Load after 100ms (form dropdowns)
             setTimeout(async () => {
-                console.log('ðŸš€ [Performance] Wave 2: Loading IMPORTANT data (forms, dropdowns)...');
+                console.log('🚀 [Performance] Wave 2: Loading IMPORTANT data (forms, dropdowns)...');
 
                 const wave2 = await Promise.all([
                     safeFetch('departments/all_data', force),
-                    safeFetch('sections', force),
+                    safeFetch('sections/all_data', force),
                     safeFetch('roles', force),
                     safeFetch('jobs', force),
                     safeFetch('positions/all_data', force),
@@ -1140,12 +1161,12 @@ export const DataProvider = ({ children }) => {
                     }
                 });
 
-                console.log('âœ… [Performance] Wave 2 complete. Forms ready!');
+                console.log('✅ [Performance] Wave 2 complete. Forms ready!');
             }, 100);
 
             // WAVE 3: OPTIONAL - Load after 500ms (geo data, employees)
             setTimeout(async () => {
-                console.log('ðŸš€ [Performance] Wave 3: Loading OPTIONAL data (geo, employees)...');
+                console.log('🚀 [Performance] Wave 3: Loading OPTIONAL data (geo, employees)...');
 
                 const wave3 = await Promise.all([
                     safeFetch('employees/all_data', force),
@@ -1193,7 +1214,7 @@ export const DataProvider = ({ children }) => {
                 setGeoVisitingLocations(universalSort(geoVisitingRes));
                 setGeoLandmarks(universalSort(geoLandmarksRes));
 
-                console.log('âœ… [Performance] Wave 3 complete. All data loaded!');
+                console.log('✅ [Performance] Wave 3 complete. All data loaded!');
             }, 500);
 
         } catch (err) {
@@ -1206,7 +1227,7 @@ export const DataProvider = ({ children }) => {
 
         // If message is an object, parse it to extract meaningful error messages
         if (typeof message === 'object' && message !== null) {
-            console.warn('âš ï¸ showNotification received an object:', message);
+            console.warn('⚠️ showNotification received an object:', message);
 
             const entries = Object.entries(message);
             if (entries.length > 0) {
@@ -1248,7 +1269,7 @@ export const DataProvider = ({ children }) => {
             displayMessage = String(displayMessage);
         }
 
-        console.log('ðŸ“¢ Displaying notification:', displayMessage);
+        console.log('📢 Displaying notification:', displayMessage);
         setNotification({ show: true, message: displayMessage, type });
         setTimeout(() => setNotification({ show: false, message: '', type: 'success' }), 4000);
     };
@@ -1355,16 +1376,16 @@ export const DataProvider = ({ children }) => {
     };
 
     const fetchPositionDetail = async (id) => {
-        setLoading(true);
+        // Open modal immediately with spinner (don't use global loading which hides the page)
+        setSelectedPosition(null);
+        setShowPositionDetail(true);
         try {
             const result = await api.get(`positions/${id}/details/`);
             setSelectedPosition(result);
-            setShowPositionDetail(true);
         } catch (err) {
             console.error("Failed to fetch position details:", err);
-            showNotification("Could not load full position details", "error");
-        } finally {
-            setLoading(false);
+            showNotification("Could not load position details. Please try again.", "error");
+            setShowPositionDetail(false);
         }
     };
 
@@ -1633,7 +1654,7 @@ export const DataProvider = ({ children }) => {
                     fetchDropdownData(endpoint, null, true) // Force refresh for specific endpoint
                 ];
 
-                // âš¡ INTELLIGENT SYNC: If we updated a Geo component, refresh the entire Geo chain
+                // ⚡ INTELLIGENT SYNC: If we updated a Geo component, refresh the entire Geo chain
                 // to ensure all cascading dropdowns on other pages are synchronized.
                 if (endpoint.startsWith('geo-') || ['visiting-locations', 'landmarks'].includes(endpoint)) {
                     refreshTasks.push(fetchDropdownData(null, null, true)); // Full sync for Geo with FORCE
@@ -1686,20 +1707,20 @@ export const DataProvider = ({ children }) => {
             }
 
         } catch (err) {
-            console.log('ðŸ”´ RAW ERROR OBJECT:', err);
-            console.log('ðŸ”´ ERROR TYPE:', typeof err);
-            console.log('ðŸ”´ ERROR KEYS:', err ? Object.keys(err) : 'null');
+            console.log('🔴 RAW ERROR OBJECT:', err);
+            console.log('🔴 ERROR TYPE:', typeof err);
+            console.log('🔴 ERROR KEYS:', err ? Object.keys(err) : 'null');
 
             let errorMessage = `Error saving ${modalType}`;
 
             if (err && typeof err === 'object') {
                 // If it's a standard validation error object from DRF
                 const entries = Object.entries(err);
-                console.log('ðŸ”´ ERROR ENTRIES:', entries);
+                console.log('🔴 ERROR ENTRIES:', entries);
 
                 if (entries.length > 0) {
                     let messages = entries.map(([key, val]) => {
-                        console.log(`ðŸ”´ Processing field: ${key}, value:`, val);
+                        console.log(`🔴 Processing field: ${key}, value:`, val);
 
                         // Handler for potential JSON strings in error/details keys
                         if (key === 'error' || key === 'details' || key === 'detail') {
@@ -1714,7 +1735,7 @@ export const DataProvider = ({ children }) => {
                                             if (msg.toLowerCase().includes('already exists') || msg.match(/with this .+ already exists/i)) {
                                                 msg = `This ${label.toLowerCase()} already exists`;
                                             }
-                                            return `â€¢ ${label}: ${msg}`;
+                                            return `• ${label}: ${msg}`;
                                         });
                                     }
                                     return val;
@@ -1734,12 +1755,12 @@ export const DataProvider = ({ children }) => {
                             messageText = `This ${fieldLabel.toLowerCase()} already exists`;
                         }
 
-                        return `â€¢ ${fieldLabel}: ${messageText}`;
+                        return `• ${fieldLabel}: ${messageText}`;
                     }).flat().filter(Boolean);
 
                     // Deduplicate identical messages
                     messages = [...new Set(messages)];
-                    console.log('ðŸ”´ FINAL DEDUPLICATED MESSAGES:', messages);
+                    console.log('🔴 FINAL DEDUPLICATED MESSAGES:', messages);
 
                     if (messages.length > 0) {
                         errorMessage = messages.join('\n');
@@ -1753,20 +1774,20 @@ export const DataProvider = ({ children }) => {
                 } else {
                     // No entries found, try to extract any string value
                     errorMessage = err.detail || err.error || err.message || 'An error occurred';
-                    console.log('ðŸ”´ No entries, SET errorMessage to:', errorMessage);
+                    console.log('🔴 No entries, SET errorMessage to:', errorMessage);
                 }
             } else if (typeof err === 'string') {
                 errorMessage = err;
-                console.log('ðŸ”´ Error is string, SET errorMessage to:', errorMessage);
+                console.log('🔴 Error is string, SET errorMessage to:', errorMessage);
             }
 
             // Final safety check: ensure errorMessage is a string
             if (typeof errorMessage !== 'string') {
-                console.error('ðŸ”´ ERROR: errorMessage is not a string!', errorMessage);
+                console.error('🔴 ERROR: errorMessage is not a string!', errorMessage);
                 errorMessage = 'An unexpected error occurred';
             }
 
-            console.log('ðŸ”´ FINAL ERROR MESSAGE (type: ' + typeof errorMessage + '):', errorMessage);
+            console.log('🔴 FINAL ERROR MESSAGE (type: ' + typeof errorMessage + '):', errorMessage);
             showNotification(errorMessage, 'error');
         } finally {
             setIsSubmitting(false);

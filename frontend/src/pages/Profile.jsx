@@ -131,7 +131,7 @@ const Profile = () => {
                         <p style={{ color: '#64748b' }}>Your user identity is not linked to a valid employee profile.</p>
                         <button onClick={() => navigate('/')} className="btn-primary" style={{ marginTop: '1rem' }}>Return to Dashboard</button>
                     </div>
-                ) : (
+                ) : data && (
                     <>
 
                         {/* LEFT COLUMN: Identity Card */}

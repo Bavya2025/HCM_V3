@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, useMapEvents, useMap, GeoJSON } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap, GeoJSON, LayersControl } from 'react-leaflet';
+
+const { BaseLayer } = LayersControl;
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -20,9 +22,11 @@ const LocationMarker = ({ position, setPosition, onLocationSelect }) => {
     const map = useMapEvents({
         click(e) {
             const { lat, lng } = e.latlng;
-            const newPos = [lat, lng];
+            const roundedLat = parseFloat(lat.toFixed(4));
+            const roundedLng = parseFloat(lng.toFixed(4));
+            const newPos = [roundedLat, roundedLng];
             setPosition(newPos);
-            onLocationSelect(lat, lng);
+            onLocationSelect(roundedLat, roundedLng);
             // map.flyTo(e.latlng, map.getZoom()); // Optional: fly to click
         },
     });
@@ -130,10 +134,26 @@ const GeoMapPicker = ({ latitude, longitude, onLocationSelect, searchQuery }) =>
                 scrollWheelZoom={true}
                 style={{ height: '100%', width: '100%' }}
             >
-                <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
+                <LayersControl position="topleft">
+                    <BaseLayer checked name="Standard Map">
+                        <TileLayer
+                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        />
+                    </BaseLayer>
+                    <BaseLayer name="Satellite View">
+                        <TileLayer
+                            attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EBP, and the GIS User Community'
+                            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                        />
+                    </BaseLayer>
+                    <BaseLayer name="Terrain / Topo">
+                        <TileLayer
+                            attribution='Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
+                            url="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
+                        />
+                    </BaseLayer>
+                </LayersControl>
 
                 {geoJsonData && (
                     <GeoJSON

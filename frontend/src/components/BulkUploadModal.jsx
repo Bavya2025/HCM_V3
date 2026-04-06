@@ -8,7 +8,7 @@ console.log('%c[PREMIUM UI] ✨ BulkUploadModal.jsx - STATE OF THE ART REDESIGN'
 
 const BulkUploadModal = ({ isOpen, onClose, section }) => {
     const { showNotification, fetchDropdownData, fetchData, activeSection } = useData();
-    
+
     // Core State
     const [file, setFile] = useState(null);
     const [previewData, setPreviewData] = useState([]);
@@ -34,6 +34,108 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
         const newRow = {};
         const keys = Object.keys(row);
         keys.forEach(key => { newRow[key.trim()] = clean(row[key]); });
+
+        const fixDate = (dateVal) => {
+            if (!dateVal) return dateVal;
+            try {
+                let v = dateVal;
+                if (typeof v === 'string' && /^\d+$/.test(v.trim())) {
+                    v = parseInt(v.trim(), 10);
+                }
+                if (!isNaN(v) && v !== '' && typeof v === 'number' && v > 20000 && v < 100000) {
+                    const date = new Date(Math.round((v - 25569) * 86400 * 1000));
+                    return date.toISOString().split('T')[0];
+                } else if (String(v).includes('/') || String(v).includes('-')) {
+                    const parts = String(v).split(/[\/-]/);
+                    if (parts.length === 3) {
+                        try {
+                            const d = new Date(v);
+                            if(!isNaN(d.getTime())) {
+                                // Prevent India +5:30 jumping backwards to previous day
+                                const offset = d.getTimezoneOffset() * 60000;
+                                return new Date(d.getTime() - offset).toISOString().split('T')[0];
+                            }
+                        }catch(e){}
+                    }
+                } else if (String(v).includes(' ')) {
+                    return String(v).split(' ')[0];
+                }
+            } catch (e) {
+                console.error('Date normalization failed for:', dateVal);
+            }
+            return dateVal;
+        };
+
+        if (section === 'employees') {
+            const employeeMap = {
+                'name': ['name', 'full name', 'employee name', '* name', 'name *', 'Name *'],
+                'email': ['email', 'email address', 'official email', 'login email', '* email', 'email *', 'Email *'],
+                'phone': ['phone', 'mobile', 'contact', 'phone number', '* phone', 'phone *', 'Phone *'],
+                'employee_code': ['code', 'employee code', 'id', 'emp code', '* employee code', 'employee code *', 'Employee Code *'],
+                'gender': ['gender', 'sex', '* gender', 'gender *', 'Gender *'],
+                'date_of_birth': ['date of birth', 'dob', '* date of birth', 'date of birth *', 'Date of Birth *'],
+                'employment_type': ['employment type', 'type', '* employment type', 'employment type *', 'Employment Type *'],
+                'hire_date': ['hire date', 'joining date', 'start date', '* hire date', 'hire date *', '* joining date', 'joining date *', 'Joining Date *'],
+                'status': ['status', 'active', 'is active', '* status', 'status *'],
+                'Position Codes': ['position codes', 'positions', 'tagged positions', 'position code', 'tagged position code']
+            };
+
+            const normalized = {};
+            Object.keys(employeeMap).forEach(targetKey => {
+                const sourceKey = keys.find(k => employeeMap[targetKey].includes(k.toLowerCase().trim()));
+                if (sourceKey) normalized[targetKey] = clean(row[sourceKey]);
+            });
+
+            if (normalized.hire_date) normalized.hire_date = fixDate(normalized.hire_date);
+            if (normalized.date_of_birth) normalized.date_of_birth = fixDate(normalized.date_of_birth);
+
+            // Employment Type normalization
+            if (normalized.employment_type) {
+                const et = String(normalized.employment_type).toLowerCase();
+                if (et.includes('perm')) normalized.employment_type = 'Permanent';
+                else if (et.includes('temp') || et.includes('cont')) normalized.employment_type = 'Temporary';
+            }
+
+            return normalized;
+        }
+
+        if (section === 'positions') {
+            const positionMap = {
+                'Position Title': ['position title', 'position name', 'name', 'title', 'position', '* position title'],
+                'Position Code': ['position code', 'code', 'pos code'],
+                'Designation Rank / Level': ['designation rank', 'level', 'position level', 'rank', 'designation rank / level'],
+                'Activation Date': ['activation date', 'start date', 'date', 'effective date'],
+                'Job Family': ['job family', 'family'],
+                'Role Type': ['role type', 'type'],
+                'Role Name': ['role name', 'role', 'role code'],
+                'Job Profile (Specific Role)': ['job profile', 'job', 'job code', 'job profile (specific role)'],
+                'Structural Tier (Office Level)': ['structural tier', 'office level', 'tier', 'structural tier (office level)'],
+                'Assign to Office / Unit': ['assign to office', 'office', 'unit', 'assign to office / unit'],
+                'Department': ['department', 'dept', 'division'],
+                'Section / Team': ['section', 'unit', 'section / team'],
+                'Reporting To (Codes)': ['reporting to', 'reports to', 'boss', 'manager', 'reporting codes', 'reporting to (codes)'],
+                'Status': ['status']
+            };
+
+            const normalized = {};
+            Object.keys(positionMap).forEach(targetKey => {
+                const sourceKey = keys.find(k => positionMap[targetKey].includes(k.toLowerCase().trim()));
+                if (sourceKey) normalized[targetKey] = clean(row[sourceKey]);
+            });
+            
+            if (normalized['Activation Date']) {
+                normalized['Activation Date'] = fixDate(normalized['Activation Date']);
+            }
+
+            // Pass through status and other fields if not found in map
+            if (!normalized.Status) {
+                const statusKey = keys.find(k => k.toLowerCase().trim() === 'status');
+                if (statusKey) normalized.Status = clean(row[statusKey]);
+                else normalized.Status = 'Active';
+            }
+
+            return normalized;
+        }
 
         const findBestKey = (category) => {
             const cat = category.toLowerCase().trim();
@@ -66,8 +168,32 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
                 else if (k.includes('cluster')) newRow['Cluster Code'] = clean(row[key]);
             }
         });
+
+        // Fix Excel date parsing for Activation Date specifically
+        if (newRow['Activation Date'] !== undefined && newRow['Activation Date'] !== null) {
+            let val = newRow['Activation Date'];
+            // If it came as a string containing only digits, parse the integer
+            if (typeof val === 'string' && /^\d+$/.test(val.trim())) {
+                val = parseInt(val.trim(), 10);
+            }
+            // If it's a numeric literal from Excel representing a date, convert it to YYYY-MM-DD
+            if (typeof val === 'number' && val > 20000 && val < 100000) {
+                const date = new Date(Math.round((val - 25569) * 86400 * 1000));
+                newRow['Activation Date'] = date.toISOString().split('T')[0];
+            } else if (typeof val === 'string' && (val.includes('/') || val.includes('-'))) {
+                // If it arrived as an actual date string, normalize it
+                try {
+                    const d = new Date(val);
+                    if (!isNaN(d.getTime())) {
+                        newRow['Activation Date'] = d.toISOString().split('T')[0];
+                    }
+                } catch(e) {}
+            }
+        }
+        
         return newRow;
     };
+
 
     useEffect(() => {
         if (isOpen) {
@@ -130,7 +256,7 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
         setChunkErrors([]);
         setCreatedCount(0);
         setUpdatedCount(0);
-        
+
         abortControllerRef.current = new AbortController();
         const { signal } = abortControllerRef.current;
 
@@ -140,10 +266,12 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
                 const data = evt.target.result;
                 const workbook = XLSX.read(data, { type: 'array' });
                 const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-                const normalizedData = jsonData.map(normalizeRow);
+                const normalizedData = jsonData.map(normalizeRow).filter(r => r && Object.keys(r).length > 0);
 
                 // Pre-validation
                 const mandatoryFields = {
+                    'employees': ['name', 'email', 'phone', 'employee_code', 'date_of_birth', 'gender', 'employment_type', 'hire_date'],
+                    'positions': ['Position Title', 'Designation Rank / Level', 'Role Name', 'Assign to Office / Unit', 'Department'],
                     'geo-continents': ['Continent', 'Continent Code'],
                     'geo-countries': ['Continent', 'Country', 'Country Code'],
                     'geo-states': ['Continent', 'Country', 'State', 'State Code'],
@@ -152,15 +280,27 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
                     'geo-clusters': ['Continent', 'Country', 'State', 'District', 'Mandal', 'Cluster', 'Cluster Code']
                 };
 
+
                 const fieldsToCheck = mandatoryFields[section] || [];
                 const preValidationErrors = [];
 
+                const codeCounts = {};
                 normalizedData.forEach((row, idx) => {
+                    // Check within-file duplicates for employee_code
+                    if (section === 'employees' && row.employee_code) {
+                        const code = String(row.employee_code).toUpperCase();
+                        if (codeCounts[code]) {
+                            preValidationErrors.push({ row: idx + 2, reason: `Duplicate Employee Code "${code}" found within this file.`, data: row });
+                        } else {
+                            codeCounts[code] = true;
+                        }
+                    }
+
                     for (const field of fieldsToCheck) {
                         const val = String(row[field] || '').trim();
                         if (!val || val === '-') {
                             preValidationErrors.push({ row: idx + 2, reason: `${field} is missing.`, data: row });
-                            break; 
+                            break;
                         }
                     }
                 });
@@ -179,17 +319,24 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
                     return;
                 }
 
-                setUploadStatus('uploading');
-                const totalChunks = Math.ceil(normalizedData.length / CHUNK_SIZE);
+                const currentChunkSize = section === 'employees' ? 50 : CHUNK_SIZE;
+                const totalChunks = Math.ceil(normalizedData.length / currentChunkSize);
                 let allErrors = [], cCreated = 0, cUpdated = 0, cProcessed = 0;
 
                 for (let i = 0; i < totalChunks; i++) {
                     if (signal.aborted) throw new Error('Process aborted.');
-                    const chunk = normalizedData.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
-                    
+                    const chunk = normalizedData.slice(i * currentChunkSize, (i + 1) * currentChunkSize);
+
+
                     try {
-                        const response = await api.post(`geo/bulk-upload/?section=${section}`, chunk, { signal });
+                        let targetEndpoint = '';
+                        if (section === 'employees') targetEndpoint = 'employees/bulk-upload/';
+                        else if (section === 'positions') targetEndpoint = 'positions/bulk-upload/';
+                        else targetEndpoint = `geo/bulk-upload/?section=${section}`;
                         
+                        const response = await api.post(targetEndpoint, chunk, { signal });
+
+
                         // Always accumulate counts, even if there are partial errors in the batch
                         cCreated += (response.created || 0);
                         cUpdated += (response.updated || 0);
@@ -199,7 +346,10 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
                         }
                     } catch (err) {
                         if (err.name !== 'AbortError') {
-                            allErrors.push(`Network error in batch ${i+1}`);
+                            console.error("Upload failed", err);
+                            let errorReason = err?.detail || err?.details || err?.error || err?.message || JSON.stringify(err) || `Network/Server Error in batch ${i + 1}`;
+                            if (typeof errorReason === 'object') errorReason = JSON.stringify(errorReason);
+                            allErrors.push({ row: 'Batch ' + (i + 1), reason: String(errorReason), data: {} });
                         }
                     }
 
@@ -210,15 +360,16 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
                     setUploadProgress(Math.round((cProcessed / normalizedData.length) * 100));
                     setChunkErrors(allErrors);
 
-                    if (i + 1 < totalChunks) await new Promise(r => setTimeout(r, 200));
+                    if (i + 1 < totalChunks) await new Promise(r => setTimeout(r, 50));
+
                 }
 
                 setResult({ success: allErrors.length === 0, total_processed: normalizedData.length, created: cCreated, updated: cUpdated, errors: allErrors });
                 setStage('final');
-                
+
                 setTimeout(() => {
-                    fetchDropdownData().catch(() => {});
-                    if (activeSection === section) fetchData(true, true, 1).catch(() => {});
+                    fetchDropdownData().catch(() => { });
+                    if (activeSection === section) fetchData(true, true, 1).catch(() => { });
                 }, 500);
 
             } catch (err) {
@@ -235,50 +386,83 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
         let headers = {};
         const s = (section || '').toLowerCase();
         if (s.includes('clusters')) {
-            headers = { 
-                'Continent Name': 'Asia', 
-                'Country Name': 'India', 
-                'State Name': 'Andhra Pradesh', 
-                'District Name': 'Visakhapatnam', 
-                'Mandal Name': 'Gajuwaka', 
-                'Cluster Name': 'Gajuwaka-1', 
-                'Cluster Code': 'GAJ-01',
+            headers = {
+                'Continent Name': 'Asia',
+                'Country Name': 'India',
+                'State Name': 'Andhra Pradesh',
+                'District Name': 'Visakhapatnam',
+                'Mandal Name': 'Gajuwaka',
                 'Cluster Type': 'Village'
             };
+        } else if (s.includes('positions')) {
+            headers = {
+                'Position Title': 'Senior Project Manager',
+                'Position Code': 'POS-001',
+                'Designation Rank / Level': 'Level Name',
+                'Activation Date': '2023-01-01',
+                'Job Family': 'Family Name',
+                'Role Type': 'Type Name',
+                'Role Name': 'Role Name',
+                'Job Profile (Specific Role)': 'Job Name',
+                'Structural Tier (Office Level)': 'State/Circle/Dist',
+                'Assign to Office / Unit': 'Office Name',
+                'Department': 'Department Name',
+                'Section / Team': 'Section Name',
+                'Reporting To (Codes)': 'POS-REP-01, POS-REP-02',
+                'Status': 'Active'
+            };
+        } else if (s.includes('employees')) {
+            headers = {
+                'Name *': 'John Doe',
+                'Email *': 'john.doe@example.com (Login)',
+                'Phone *': '9876543210',
+                'Employee Code *': 'EMP001',
+                'Joining Date *': '2023-01-01',
+                'Date of Birth *': '1995-05-15',
+                'Gender *': 'Male',
+                'Employment Type *': 'Permanent',
+                'Status': 'Active',
+                'Position Codes': 'POS-001, POS-002',
+                'Address': '123 Street, City',
+                'Father Name': 'Sr John Doe',
+                'Mother Name': 'Smt Doe'
+            };
+
         } else if (s.includes('mandals')) {
-            headers = { 
-                'Continent Name': 'Asia', 
-                'Country Name': 'India', 
-                'State Name': 'Andhra Pradesh', 
-                'District Name': 'Visakhapatnam', 
-                'Mandal Name': 'Gajuwaka', 
-                'Mandal Code': 'GN-01' 
+
+            headers = {
+                'Continent Name': 'Asia',
+                'Country Name': 'India',
+                'State Name': 'Andhra Pradesh',
+                'District Name': 'Visakhapatnam',
+                'Mandal Name': 'Gajuwaka',
+                'Mandal Code': 'GN-01'
             };
         } else if (s.includes('districts')) {
-            headers = { 
-                'Continent Name': 'Asia', 
-                'Country Name': 'India', 
-                'State Name': 'Andhra Pradesh', 
-                'District Name': 'Visakhapatnam', 
-                'District Code': 'VZ-01' 
+            headers = {
+                'Continent Name': 'Asia',
+                'Country Name': 'India',
+                'State Name': 'Andhra Pradesh',
+                'District Name': 'Visakhapatnam',
+                'District Code': 'VZ-01'
             };
         } else if (s.includes('states')) {
-            headers = { 
-                'Continent Name': 'Asia', 
-                'Country Name': 'India', 
-                'State Name': 'Andhra Pradesh', 
-                'State Code': 'AP-01' 
+            headers = {
+                'Continent Name': 'Asia',
+                'Country Name': 'India',
+                'State Name': 'Andhra Pradesh',
+                'State Code': 'AP-01'
             };
         } else if (s.includes('countries')) {
-            headers = { 
-                'Continent Name': 'Asia', 
-                'Country Name': 'India', 
-                'Country Code': 'IN' 
+            headers = {
+                'Continent Name': 'Asia',
+                'Country Name': 'India',
+                'Country Code': 'IN'
             };
         } else {
-            headers = { 
-                'Continent Name': 'Asia', 
-                'Continent Code': 'AS' 
+            headers = {
+                'Continent Name': 'Asia',
+                'Continent Code': 'AS'
             };
         }
 
@@ -351,9 +535,9 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
                 {/* Header Section */}
                 <div style={styles.header}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-                        <div style={{ 
-                            width: '56px', height: '56px', borderRadius: '20px', 
-                            background: 'linear-gradient(135deg, #7c3aed, #db2777)', 
+                        <div style={{
+                            width: '56px', height: '56px', borderRadius: '20px',
+                            background: 'linear-gradient(135deg, #7c3aed, #db2777)',
                             color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
                             boxShadow: '0 12px 24px -6px rgba(124, 58, 237, 0.4)'
                         }}>
@@ -362,12 +546,14 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
                         <div>
                             <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>Bulk Hierarchy Sync</h2>
                             <p style={{ margin: 0, fontSize: '0.9rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <Layers size={14} /> Unified Engine • Level: {section.split('-')[1].toUpperCase()}
+                                <Layers size={14} /> Unified Engine • Level: {(section.split('-')[1] || section).toUpperCase()}
+
+
                             </p>
                         </div>
                     </div>
-                    <button onClick={onClose} style={{ background: '#f1f5f9', border: 'none', padding: '10px', borderRadius: '15px', cursor: 'pointer', color: '#64748b', transition: '0.2s' }}>
-                        <X size={24} />
+                    <button type="button" className="btn-close" onClick={onClose} style={{ padding: '8px 16px', fontSize: '0.8rem' }}>
+                        <X size={14} /> CLOSE
                     </button>
                 </div>
 
@@ -382,7 +568,8 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
                                 <div>
                                     <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>1. Acquire Schema</h3>
                                     <p style={{ margin: '8px 0 0 0', fontSize: '0.9rem', color: '#64748b', lineHeight: 1.5 }}>
-                                        Download the master template containing accurate hierarchy headers for {section.split('-')[1]}.
+                                        Download the master template containing accurate hierarchy headers for {section.split('-')[1] || section}.
+
                                     </p>
                                 </div>
                                 <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', gap: '8px', color: '#7c3aed', fontWeight: 700, fontSize: '0.9rem' }}>
@@ -422,7 +609,7 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
                                     </div>
                                 </div>
                                 <button onClick={() => setStage('selection')} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                   <RotateCcw size={14} /> Replace File
+                                    <RotateCcw size={14} /> Replace File
                                 </button>
                             </div>
 
@@ -471,7 +658,7 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
                                 {uploadStatus === 'validating' ? 'Verifying Integrity...' : 'Syncing Global Hierarchy'}
                             </h3>
                             <p style={{ margin: '10px 0 0 0', color: '#64748b' }}>Deploying {processedRows.toLocaleString()} of {totalRows.toLocaleString()} entities into the infrastructure.</p>
-                            
+
                             <div style={{ width: '100%', height: '14px', backgroundColor: '#f1f5f9', borderRadius: '10px', marginTop: '3rem', overflow: 'hidden', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)' }}>
                                 <div style={{ width: `${uploadProgress}%`, height: '100%', background: 'linear-gradient(90deg, #7c3aed, #db2777)', borderRadius: '10px', transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1)' }}></div>
                             </div>
@@ -485,7 +672,7 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
                     {/* STAGE 4: FINAL */}
                     {stage === 'final' && (
                         <div style={{ textAlign: 'center', animation: 'fadeIn 0.5s ease-out' }}>
-                            <div style={{ 
+                            <div style={{
                                 width: '100px', height: '100px', borderRadius: '35px', margin: '0 auto 1.5rem auto',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                                 backgroundColor: result.errors.length > 0 ? '#fef2f2' : '#f0fdf4',
@@ -498,10 +685,10 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
                             <h3 style={{ fontSize: '2rem', fontWeight: 950, letterSpacing: '-0.04em' }}>
                                 {result.errors.length > 0 ? 'Sync Session Summary' : 'Hierarchy Fully Optimized'}
                             </h3>
-                            
+
                             {result.errors.length > 0 && (
-                                <div style={{ 
-                                    display: 'inline-flex', alignItems: 'center', gap: '8px', 
+                                <div style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: '8px',
                                     padding: '6px 16px', borderRadius: '100px', marginTop: '12px',
                                     background: result.isPreValidation ? '#fff7ed' : '#f0fdf4',
                                     border: `1px solid ${result.isPreValidation ? '#ffedd5' : '#dcfce7'}`,
@@ -552,19 +739,26 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
                                             <tbody>
                                                 {result.errors.slice(0, 100).map((err, i) => (
                                                     <tr key={i} style={{ borderBottom: '1px solid #fff1f2' }}>
-                                                        <td style={{ padding: '10px 15px', fontWeight: 900, color: '#9f1239' }}>#{err.row || i+1}</td>
+                                                        <td style={{ padding: '10px 15px', fontWeight: 900, color: '#9f1239' }}>#{err.row || i + 1}</td>
                                                         <td style={{ padding: '10px 15px' }}>
                                                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                                                                {['Continent', 'Country', 'State', 'District', 'Mandal', 'Cluster'].map(key => (
+                                                                {(section === 'employees'
+                                                                    ? ['name', 'email', 'employee_code', 'phone']
+                                                                    : ['Continent', 'Country', 'State', 'District', 'Mandal', 'Cluster']
+                                                                ).map(key => (
                                                                     err.data?.[key] && (
                                                                         <span key={key} style={{ padding: '2px 6px', background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '6px', fontSize: '0.65rem', color: '#9f1239' }}>
-                                                                            <strong style={{ opacity: 0.6 }}>{key.charAt(0)}:</strong> {err.data[key]}
+                                                                            <strong style={{ opacity: 0.6 }}>{key.charAt(0).toUpperCase() + key.slice(1, 2).toLowerCase()}:</strong> {err.data[key]}
                                                                         </span>
                                                                     )
                                                                 ))}
+
                                                             </div>
                                                         </td>
-                                                        <td style={{ padding: '10px 15px', color: '#be123e', fontWeight: 600 }}>{err.reason || String(err)}</td>
+                                                        <td style={{ padding: '10px 15px', color: '#be123e', fontWeight: 600 }}>
+                                                            {err.reason || (err.errors ? Object.entries(err.errors).map(([field, msgs]) => `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`).join(' | ') : String(err))}
+                                                        </td>
+
                                                     </tr>
                                                 ))}
                                             </tbody>
@@ -593,7 +787,7 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
                             <button
                                 onClick={handleUpload}
                                 className="pulse-purple"
-                                style={{ 
+                                style={{
                                     background: 'linear-gradient(135deg, #7c3aed, #db2777)', border: 'none', color: 'white',
                                     padding: '12px 48px', borderRadius: '18px', fontWeight: 800, cursor: 'pointer',
                                     display: 'flex', alignItems: 'center', gap: '12px', fontSize: '1rem',

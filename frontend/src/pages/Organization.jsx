@@ -1,8 +1,9 @@
 import React from 'react';
-import { Layers, Building2, Plus, Edit, X, Eye, Settings, MapPin, Map, Globe, Calendar, ChevronLeft, ChevronRight, TrendingUp, Crown, Users, Pencil, Trash2, Truck } from 'lucide-react';
+import { Layers, Building2, Plus, Edit, X, Eye, Settings, MapPin, Map, Globe, Calendar, ChevronLeft, ChevronRight, TrendingUp, Crown, Users, Pencil, Trash2, Truck, Maximize2, Minimize2, Split } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import GenericTable from '../components/GenericTable';
 import BavyaSpinner from '../components/BavyaSpinner';
+import OrganizationMap from '../components/OrganizationMap';
 
 const Organization = () => {
     const {
@@ -19,6 +20,8 @@ const Organization = () => {
     } = useData();
 
     const scrollContainerRef = React.useRef(null);
+    const [viewMode, setViewMode] = React.useState('full-tree'); // 'full-tree', 'map-view', 'split-view'
+    const [selectedOfficeId, setSelectedOfficeId] = React.useState(null);
 
     // Auto-scroll to center of tree on load
     React.useEffect(() => {
@@ -80,6 +83,7 @@ const Organization = () => {
                 <div
                     className={`tree-node-box ${isVisualRoot ? 'root-node' : ''} ${isExpanded ? 'active-parent' : ''}`}
                     onClick={(e) => {
+                        setSelectedOfficeId(office.id);
                         if (allChildren.length > 0) {
                             toggleNode(e, office.id);
                         } else {
@@ -130,8 +134,8 @@ const Organization = () => {
                                             <div className="facility-detail-list" onClick={(e) => e.stopPropagation()}>
                                                 <div className="facility-list-header">
                                                     <h3>{office.name} Units</h3>
-                                                    <button className="close-detail-btn" onClick={() => setOpenSummaryId(null)}>
-                                                        <X size={14} />
+                                                    <button type="button" className="btn-close" onClick={() => setOpenSummaryId(null)} style={{ padding: '4px 10px', fontSize: '0.75rem', gap: '4px' }}>
+                                                        <X size={12} /> CLOSE
                                                     </button>
                                                 </div>
                                                 <div className="facility-item-scroll">
@@ -155,8 +159,11 @@ const Organization = () => {
                                 facilities.map(f => (
                                     <li key={f.id} className="tree-li">
                                         <div
-                                            className="tree-node-box facility-node"
-                                            onClick={() => handleViewOffice ? handleViewOffice(f) : handleEdit('Offices', f)}
+                                            className={`tree-node-box facility-node ${selectedOfficeId === f.id ? 'active-parent' : ''}`}
+                                            onClick={() => {
+                                                setSelectedOfficeId(f.id);
+                                                handleViewOffice ? handleViewOffice(f) : handleEdit('Offices', f);
+                                            }}
                                         >
                                             <footer>Facility</footer>
                                             <header>{f.name}</header>
@@ -251,81 +258,181 @@ const Organization = () => {
                         <button className="btn-secondary" style={{ padding: '0.8rem 1.2rem', borderRadius: '12px', background: 'white', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => window.location.reload()}>
                             <TrendingUp className="glass-float" size={18} /> Sync Structure
                         </button>
+                        
+                        {/* View Mode Switcher */}
+                        <div style={{ display: 'flex', background: '#f8fafc', padding: '4px', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
+                            <button 
+                                onClick={() => setViewMode('full-tree')}
+                                style={{ 
+                                    padding: '8px 12px', 
+                                    borderRadius: '10px', 
+                                    border: 'none', 
+                                    background: viewMode === 'full-tree' ? 'white' : 'transparent', 
+                                    color: viewMode === 'full-tree' ? 'var(--primary)' : '#64748b', 
+                                    boxShadow: viewMode === 'full-tree' ? '0 4px 6px -1px rgba(0,0,0,0.1)' : 'none',
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: '6px', 
+                                    cursor: 'pointer',
+                                    fontWeight: 700,
+                                    fontSize: '0.75rem'
+                                }}
+                            >
+                                <Minimize2 size={16} /> Tree
+                            </button>
+                            <button 
+                                onClick={() => setViewMode('split-view')}
+                                style={{ 
+                                    padding: '8px 12px', 
+                                    borderRadius: '10px', 
+                                    border: 'none', 
+                                    background: viewMode === 'split-view' ? 'white' : 'transparent', 
+                                    color: viewMode === 'split-view' ? 'var(--primary)' : '#64748b', 
+                                    boxShadow: viewMode === 'split-view' ? '0 4px 6px -1px rgba(0,0,0,0.1)' : 'none',
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: '6px', 
+                                    cursor: 'pointer',
+                                    fontWeight: 700,
+                                    fontSize: '0.75rem'
+                                }}
+                            >
+                                <Split size={16} /> Split
+                            </button>
+                            <button 
+                                onClick={() => setViewMode('map-view')}
+                                style={{ 
+                                    padding: '8px 12px', 
+                                    borderRadius: '10px', 
+                                    border: 'none', 
+                                    background: viewMode === 'map-view' ? 'white' : 'transparent', 
+                                    color: viewMode === 'map-view' ? 'var(--primary)' : '#64748b', 
+                                    boxShadow: viewMode === 'map-view' ? '0 4px 6px -1px rgba(0,0,0,0.1)' : 'none',
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: '6px', 
+                                    cursor: 'pointer',
+                                    fontWeight: 700,
+                                    fontSize: '0.75rem'
+                                }}
+                            >
+                                <Maximize2 size={16} /> Map
+                            </button>
+                        </div>
                     </div>
                 </header>
 
-                <div style={{ position: 'relative' }}>
-                    <button onClick={scrollLeft} style={{
-                        position: 'absolute',
-                        left: '20px',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        zIndex: 999,
-                        width: '44px',
-                        height: '44px',
-                        borderRadius: '50%',
-                        background: 'white',
-                        border: '1px solid #e2e8f0',
-                        boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        color: 'var(--primary)',
-                        transition: 'all 0.2s ease',
-                    }}
-                        onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-50%) scale(1.1)'}
-                        onMouseLeave={e => e.currentTarget.style.transform = 'translateY(-50%) scale(1)'}
-                    >
-                        <ChevronLeft size={24} />
-                    </button>
+                <div style={{ 
+                    display: 'flex', 
+                    gap: '1.5rem', 
+                    height: 'calc(100vh - 280px)', 
+                    position: 'relative',
+                    transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)' 
+                }}>
+                    {/* Tree View Part */}
+                    <div style={{ 
+                        flex: viewMode === 'map-view' ? 0 : (viewMode === 'split-view' ? 1 : 1), 
+                        width: viewMode === 'map-view' ? '0' : 'auto',
+                        overflow: 'hidden',
+                        opacity: viewMode === 'map-view' ? 0 : 1,
+                        transition: 'all 0.5s ease',
+                        position: 'relative',
+                        minWidth: viewMode === 'full-tree' ? '100%' : (viewMode === 'map-view' ? '0' : '400px')
+                    }}>
+                        <div style={{ position: 'relative', height: '100%', pointerEvents: viewMode === 'map-view' ? 'none' : 'auto' }}>
+                            <button onClick={scrollLeft} style={{
+                                position: 'absolute',
+                                left: '20px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                zIndex: 999,
+                                width: '44px',
+                                height: '44px',
+                                borderRadius: '50%',
+                                background: 'white',
+                                border: '1px solid #e2e8f0',
+                                boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                color: 'var(--primary)',
+                                transition: 'all 0.2s ease',
+                            }}
+                                onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-50%) scale(1.1)'}
+                                onMouseLeave={e => e.currentTarget.style.transform = 'translateY(-50%) scale(1)'}
+                            >
+                                <ChevronLeft size={24} />
+                            </button>
 
-                    <button onClick={scrollRight} style={{
-                        position: 'absolute',
-                        right: '20px',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        zIndex: 999,
-                        width: '44px',
-                        height: '44px',
-                        borderRadius: '50%',
-                        background: 'white',
-                        border: '1px solid #e2e8f0',
-                        boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        color: 'var(--primary)',
-                        transition: 'all 0.2s ease',
-                    }}
-                        onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-50%) scale(1.1)'}
-                        onMouseLeave={e => e.currentTarget.style.transform = 'translateY(-50%) scale(1)'}
-                    >
-                        <ChevronRight size={24} />
-                    </button>
+                            <button onClick={scrollRight} style={{
+                                position: 'absolute',
+                                right: '20px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                zIndex: 999,
+                                width: '44px',
+                                height: '44px',
+                                borderRadius: '50%',
+                                background: 'white',
+                                border: '1px solid #e2e8f0',
+                                boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                color: 'var(--primary)',
+                                transition: 'all 0.2s ease',
+                            }}
+                                onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-50%) scale(1.1)'}
+                                onMouseLeave={e => e.currentTarget.style.transform = 'translateY(-50%) scale(1)'}
+                            >
+                                <ChevronRight size={24} />
+                            </button>
 
-                    <div className="tree-container" ref={scrollContainerRef}>
-                        <div className="tree-root">
-                            <div className="tree-chart" style={{ paddingBottom: '40px' }}>
-                                {rootOffices.length > 0 ? (
-                                    <ul className="tree-ul" style={{ paddingTop: 0 }}>
-                                        {rootOffices.map(office => renderOfficeNode(office))}
-                                    </ul>
-                                ) : (
-                                    <div style={{ textAlign: 'center', padding: '5rem 3rem', color: '#94a3b8' }}>
-                                        <div style={{ opacity: 0.2, marginBottom: '1.5rem' }}>
-                                            <Building2 size={80} style={{ margin: '0 auto' }} />
-                                        </div>
-                                        <h4 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1e293b', marginBottom: '0.5rem' }}>Empty Backbone</h4>
-                                        <p style={{ fontSize: '1rem', fontWeight: 500 }}>Establish your first organizational unit to visualize the hierarchy.</p>
-                                        <button className="btn-primary" style={{ marginTop: '2rem' }} onClick={() => handleAdd('Offices')}>
-                                            <Plus size={18} /> Establish Head Office
-                                        </button>
+                            <div className="tree-container" ref={scrollContainerRef} style={{ height: '100%', borderRadius: '24px' }}>
+                                <div className="tree-root">
+                                    <div className="tree-chart" style={{ paddingBottom: '40px' }}>
+                                        {rootOffices.length > 0 ? (
+                                            <ul className="tree-ul" style={{ paddingTop: 0 }}>
+                                                {rootOffices.map(office => renderOfficeNode(office))}
+                                            </ul>
+                                        ) : (
+                                            <div style={{ textAlign: 'center', padding: '5rem 3rem', color: '#94a3b8' }}>
+                                                <div style={{ opacity: 0.2, marginBottom: '1.5rem' }}>
+                                                    <Building2 size={80} style={{ margin: '0 auto' }} />
+                                                </div>
+                                                <h4 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1e293b', marginBottom: '0.5rem' }}>Empty Backbone</h4>
+                                                <p style={{ fontSize: '1rem', fontWeight: 500 }}>Establish your first organizational unit to visualize the hierarchy.</p>
+                                                <button className="btn-primary" style={{ marginTop: '2rem' }} onClick={() => handleAdd('Offices')}>
+                                                    <Plus size={18} /> Establish Head Office
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
-                                )}
+                                </div>
                             </div>
                         </div>
+                    </div>
+
+                    {/* Map View Part */}
+                    <div style={{ 
+                        flex: viewMode === 'full-tree' ? 0 : 1, 
+                        width: viewMode === 'full-tree' ? '0' : (viewMode === 'map-view' ? '100%' : 'auto'),
+                        overflow: 'hidden',
+                        opacity: viewMode === 'full-tree' ? 0 : 1,
+                        transition: 'all 0.5s ease',
+                        position: 'relative'
+                    }}>
+                        <OrganizationMap 
+                            offices={allOffices} 
+                            viewMode={viewMode}
+                            selectedOfficeId={selectedOfficeId}
+                            onOfficeClick={(off) => {
+                                setSelectedOfficeId(off.id);
+                                // Optional: also fly to it or open details?
+                            }}
+                        />
                     </div>
                 </div>
             </div>

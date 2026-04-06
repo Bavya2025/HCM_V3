@@ -9,13 +9,21 @@ const Offices = () => {
 
 
 
-    const renderTableData = React.useCallback((item) => (
+    const renderTableData = React.useCallback((item, { searchTerm, HighlightTerm }) => (
         <td>
-            <div style={{ fontWeight: 700, color: '#1e293b' }}>{item.name}</div>
+            <div style={{ fontWeight: 700, color: '#1e293b' }}>
+                <HighlightTerm text={item.name} term={searchTerm} />
+            </div>
             <div style={{ fontSize: '0.75rem', color: '#64748b', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <MapPin size={12} /> {item.level_name} | code: {item.code}
+                    <MapPin size={12} /> {item.level_name} | code: <HighlightTerm text={item.code} term={searchTerm} />
                 </span>
+                {item.district_name && (
+                    <span style={{ color: '#94a3b8' }}>• <HighlightTerm text={item.district_name} term={searchTerm} /></span>
+                )}
+                {item.mandal_name && (
+                    <span style={{ color: '#94a3b8' }}>• <HighlightTerm text={item.mandal_name} term={searchTerm} /></span>
+                )}
                 {item.is_temporary && <span style={{ color: '#f59e0b', fontWeight: 700 }}>[TEMPORARY]</span>}
                 {item.assigned_projects && item.assigned_projects.length > 0 && (
                     <>

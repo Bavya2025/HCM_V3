@@ -1,4 +1,4 @@
-    import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     ClipboardList, Search, Calendar, Activity,
     TerminalSquare, Eye, ShieldAlert, MonitorIcon,
@@ -215,11 +215,26 @@ const AuditLogs = () => {
                 </div>
                 <div style={{ flex: 1 }}>
                     <label className="filter-label">Date Range (Start)</label>
-                    <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="filter-input" />
+                    <input
+                        type="date"
+                        value={startDate}
+                        max={endDate || undefined}
+                        onChange={(e) => {
+                            setStartDate(e.target.value);
+                            if (endDate && e.target.value > endDate) setEndDate('');
+                        }}
+                        className="filter-input"
+                    />
                 </div>
                 <div style={{ flex: 1 }}>
                     <label className="filter-label">Date Range (End)</label>
-                    <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="filter-input" />
+                    <input
+                        type="date"
+                        value={endDate}
+                        min={startDate || undefined}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="filter-input"
+                    />
                 </div>
             </div>
 

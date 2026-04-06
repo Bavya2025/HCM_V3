@@ -9,6 +9,7 @@ import {
     ShieldAlert,
     Network,
     Layers,
+    LayoutGrid,
     ClipboardList,
     Building2,
     Calendar,
@@ -19,6 +20,7 @@ import {
     Clock,
     FolderKanban
 } from 'lucide-react';
+import BavyaSpinner from './BavyaSpinner';
 import { useData } from '../context/DataContext';
 
 const PositionDetailModal = () => {
@@ -29,8 +31,6 @@ const PositionDetailModal = () => {
     } = useData();
 
     const [activeTab, setActiveTab] = useState('Overview');
-
-    if (!selectedPosition) return null;
 
     const tabs = ['Overview', 'Job & Role', 'Organization Path', 'Tasks & Permissions'];
 
@@ -45,27 +45,20 @@ const PositionDetailModal = () => {
             alignItems: 'flex-start'
         }}>
             <button
+                type="button"
+                className="btn-close"
                 onClick={() => { setShowPositionDetail(false); setSelectedPosition(null); }}
                 style={{
                     position: 'absolute',
                     top: '1.5rem',
                     right: '1.5rem',
-                    background: 'rgba(255,255,255,0.2)',
-                    border: 'none',
-                    borderRadius: '50%',
-                    width: '36px',
-                    height: '36px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    color: 'white',
-                    transition: 'all 0.2s'
+                    padding: '8px 16px',
+                    fontSize: '0.8rem',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                    zIndex: 20
                 }}
-                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
-                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
             >
-                <X size={20} />
+                <X size={14} /> CLOSE
             </button>
             <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
                 <div style={{
@@ -394,34 +387,59 @@ const PositionDetailModal = () => {
     );
 
     return (
-        <div className="modal-overlay active" onClick={(e) => {
+        <div className="modal-overlay active" style={{ zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={(e) => {
             if (e.target.classList.contains('modal-overlay')) {
                 setShowPositionDetail(false);
                 setSelectedPosition(null);
             }
         }}>
-            <div className="modal-content fade-in" style={{ padding: 0, overflow: 'hidden' }}>
-                {renderHeader()}
-                <div className="modal-form-container" style={{ flex: 1, overflowY: 'auto', background: 'white' }}>
-                    {activeTab === 'Overview' && renderOverview()}
-                    {activeTab === 'Job & Role' && renderJobRole()}
-                    {activeTab === 'Organization Path' && renderOrgPath()}
-                    {activeTab === 'Tasks & Permissions' && renderTasks()}
-                </div>
-                <div style={{ padding: '1.5rem 3rem', background: '#f8fafc', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', gap: '15px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
-                            <Clock size={14} /> Registered: {new Date(selectedPosition.created_at).toLocaleDateString()}
-                        </div>
+            <div className="modal-content fade-in" style={{ 
+                padding: 0, 
+                overflow: 'hidden', 
+                background: '#fff', 
+                width: '100%', 
+                height: '100%', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                position: 'relative' 
+            }}>
+                {!selectedPosition ? (
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#fff', position: 'relative' }}>
+                        <button
+                            type="button"
+                            className="btn-close"
+                            onClick={() => { setShowPositionDetail(false); setSelectedPosition(null); }}
+                            style={{ position: 'absolute', top: '1.5rem', right: '1.5rem' }}
+                        >
+                            <X size={14} /> CLOSE
+                        </button>
+                        <BavyaSpinner label="Retrieving Position Details..." />
                     </div>
-                    <button
-                        className="btn-primary"
-                        onClick={() => { setShowPositionDetail(false); setSelectedPosition(null); }}
-                        style={{ padding: '10px 30px' }}
-                    >
-                        Close Registry
-                    </button>
-                </div>
+                ) : (
+                    <>
+                        {renderHeader()}
+                        <div className="modal-form-container" style={{ flex: 1, overflowY: 'auto', background: 'white' }}>
+                            {activeTab === 'Overview' && renderOverview()}
+                            {activeTab === 'Job & Role' && renderJobRole()}
+                            {activeTab === 'Organization Path' && renderOrgPath()}
+                            {activeTab === 'Tasks & Permissions' && renderTasks()}
+                        </div>
+                        <div style={{ padding: '1.5rem 3rem', background: '#f8fafc', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', gap: '15px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+                                    <Clock size={14} /> Registered: {new Date(selectedPosition.created_at).toLocaleDateString()}
+                                </div>
+                            </div>
+                            <button
+                                className="btn-primary"
+                                onClick={() => { setShowPositionDetail(false); setSelectedPosition(null); }}
+                                style={{ padding: '10px 30px' }}
+                            >
+                                Close Registry
+                            </button>
+                        </div>
+                    </>
+                )}
             </div>
         </div>
     );

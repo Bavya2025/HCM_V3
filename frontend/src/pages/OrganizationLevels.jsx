@@ -16,16 +16,22 @@ const OrganizationLevels = () => {
     // ensures the rank sort is preserved immediately.
     const sortedLevels = orgLevels || [];
 
-    const renderTableData = (item) => (
+    const renderTableData = (item, { searchTerm, HighlightTerm }) => (
         <>
             <td style={{ cursor: 'pointer' }} onClick={() => handleAddOfficeByLevel(item.id)}>
                 <div style={{ fontWeight: 700, color: 'var(--primary)', textDecoration: 'underline', textDecorationStyle: 'dotted' }}>
-                    {item.level_code}
+                    <HighlightTerm text={item.level_code} term={searchTerm} />
                 </div>
             </td>
             <td style={{ cursor: 'pointer' }} onClick={() => handleAddOfficeByLevel(item.id)}>
-                <div style={{ fontWeight: 600 }} className="hover-link">{item.name}</div>
-                {item.parent_name && <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Sub-level of {item.parent_name}</div>}
+                <div style={{ fontWeight: 600 }} className="hover-link">
+                    <HighlightTerm text={item.name} term={searchTerm} />
+                </div>
+                {item.parent_name && (
+                    <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                        Sub-level of <HighlightTerm text={item.parent_name} term={searchTerm} />
+                    </div>
+                )}
             </td>
         </>
     );

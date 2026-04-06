@@ -36,8 +36,10 @@ const SearchableSelect = ({
 
     const filteredOptions = options.filter(opt => {
         const label = (opt.name || opt.label || '').toLowerCase();
-        const search = searchTerm.toLowerCase();
-        return label.startsWith(search);
+        const search = searchTerm.toLowerCase().trim();
+        if (!search) return true;
+        // Universal Search (Contains)
+        return label.includes(search);
     });
 
     const handleSelect = (option) => {
@@ -111,6 +113,7 @@ const SearchableSelect = ({
                             type="text"
                             placeholder="Type to search..."
                             value={searchTerm}
+                            maxLength={30}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             style={{
                                 width: '100%',
@@ -144,7 +147,20 @@ const SearchableSelect = ({
                                     onMouseEnter={(e) => e.target.style.background = String(opt.id || opt.value) === String(value) ? 'var(--primary-light)' : '#f8fafc'}
                                     onMouseLeave={(e) => e.target.style.background = String(opt.id || opt.value) === String(value) ? 'var(--primary-light)' : 'transparent'}
                                 >
-                                    {opt.name || opt.label}
+                                    {(() => {
+                                        const text = opt.name || opt.label || '';
+                                        if (!searchTerm.trim()) return text;
+                                        
+                                        // Escape special characters for regex safety
+                                        const escapedTerm = searchTerm.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                                        const parts = text.toString().split(new RegExp(`(${escapedTerm})`, 'gi'));
+                                        
+                                        return parts.map((part, i) => (
+                                            part.toLowerCase() === searchTerm.trim().toLowerCase() ? 
+                                                <span key={i} style={{ backgroundColor: 'rgb(249 115 22 / 20%)', color: '#ea580c', fontWeight: 800, padding: '0 2px', borderRadius: '4px' }}>{part}</span> : 
+                                                <span key={i}>{part}</span>
+                                        ));
+                                    })()}
                                 </div>
                             ))
                         ) : (

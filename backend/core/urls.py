@@ -10,7 +10,7 @@ from .views import (
     GeoContinentViewSet, GeoCountryViewSet, GeoStateViewSet, GeoDistrictViewSet,
     GeoMandalViewSet, GeoClusterViewSet, VisitingLocationViewSet, LandmarkViewSet,
     PositionLevelViewSet, UserViewSet, LoginAPIView, LogoutAPIView, ChangePasswordView, RequestResetOTPView, ResetPasswordWithOTPView, EmployeeTaskUrlPermissionViewSet, EmployeeDetailsAPIView, APIKeyViewSet, LoginHitViewSet, BlockedEmployeeViewSet, AccountBlockHistoryViewSet, EmployeeArchiveViewSet, PositionAssignmentViewSet, PositionActivityLogViewSet,
-    GeoBulkUploadView, GeoFullHierarchyView, AuditLogViewSet
+    GeoBulkUploadView, GeoFullHierarchyView, AuditLogViewSet, PositionBulkUploadView, EmployeeBulkUploadView
 )
 from .dashboard_views import DashboardStatsView
 
@@ -72,8 +72,10 @@ urlpatterns = [
     path('auth/employee-details/', EmployeeDetailsAPIView.as_view(), name='employee-details-by-auth'),
     path('auth/request-reset-otp/', RequestResetOTPView.as_view(), name='request-reset-otp'),
     path('auth/reset-password-otp/', ResetPasswordWithOTPView.as_view(), name='reset-password-otp'),
-    path('', include(router.urls)),
     path('dashboard/stats/', DashboardStatsView.as_view(), name='dashboard-stats'),
     path('geo/bulk-upload/', GeoBulkUploadView.as_view(), name='geo-bulk-upload'),
     path('geo/full-hierarchy/', GeoFullHierarchyView.as_view(), name='geo-full-hierarchy'),
+    path('positions/bulk-upload/', PositionBulkUploadView.as_view(), name='positions-bulk-upload'),
+    path('employees/bulk-upload/', EmployeeBulkUploadView.as_view(), name='employees-bulk-upload'),
+    path('', include(router.urls)),
 ]

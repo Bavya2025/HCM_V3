@@ -56,17 +56,41 @@ const GenericTable = ({ renderTableData, customData = null }) => {
 
     const currentSectionInfo = SECTIONS.find(s => s.id === activeSection);
 
+    // Geo sections: find ASIA continent id and INDIA country id from context for default filters
+    const getGeoDefaults = () => {
+        const isGeoSection = [
+            'geo-countries', 'geo-states', 'geo-districts', 'geo-mandals',
+            'geo-clusters', 'visiting-locations', 'landmarks'
+        ].includes(activeSection);
+        if (!isGeoSection) return { continent: 'all', country: 'all' };
+        const asiaContinent = geoContinents?.find(c => c.name?.toUpperCase() === 'ASIA');
+        const indiaCountry = geoCountries?.find(c => c.name?.toUpperCase() === 'INDIA');
+        return {
+            continent: asiaContinent ? String(asiaContinent.id) : 'all',
+            country: indiaCountry ? String(indiaCountry.id) : 'all',
+        };
+    };
+
     const getInitialFilters = (forceReset = false) => {
         if (!forceReset) {
             const saved = sessionStorage.getItem(`filters_${activeSection}`);
             if (saved) {
                 try {
-                    return JSON.parse(saved);
+                    const parsed = JSON.parse(saved);
+                    // HEAL STALE FILTERS: If string IDs (names) from older versions are found where integers are expected
+                    const numericFields = ['office', 'department', 'section', 'officeLevel', 'positionLevel', 'jobFamily', 'roleType', 'role', 'job', 'task'];
+                    numericFields.forEach(f => {
+                        if (parsed[f] && isNaN(parsed[f]) && parsed[f] !== 'all') {
+                            parsed[f] = 'all';
+                        }
+                    });
+                    return parsed;
                 } catch (e) {
                     console.error("Failed to parse saved filters", e);
                 }
             }
         }
+        const { continent: defaultContinent, country: defaultCountry } = getGeoDefaults();
         return {
             searchTerm: '',
             status: 'all',
@@ -74,8 +98,8 @@ const GenericTable = ({ renderTableData, customData = null }) => {
             department: 'all',
             jobFamily: 'all',
             role: 'all',
-            continent: 'all',
-            country: 'all',
+            continent: defaultContinent,
+            country: defaultCountry,
             state: 'all',
             district: 'all',
             mandal: 'all',
@@ -89,6 +113,7 @@ const GenericTable = ({ renderTableData, customData = null }) => {
     };
 
     const [filters, setFilters] = useState(() => getInitialFilters(false));
+    const [searchError, setSearchError] = useState('');
 
     const updateFilter = (newFilters) => {
         setFilters(prev => ({ ...prev, ...newFilters }));
@@ -371,8 +396,23 @@ const GenericTable = ({ renderTableData, customData = null }) => {
 
         return matchJF && matchRT && matchR && matchJ;
     };
-
-
+    const HighlightTerm = ({ text, term }) => {
+        if (!term || !text) return <>{text}</>;
+        
+        // Escape special regex characters in the term
+        const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const parts = text.toString().split(new RegExp(`(${escapedTerm})`, 'gi'));
+        
+        return (
+            <>
+                {parts.map((part, i) => (
+                    part.toLowerCase() === term.toLowerCase() ? 
+                        <span key={i} style={{ backgroundColor: 'rgb(249 115 22 / 20%)', color: '#ea580c', fontWeight: 800, padding: '0 2px', borderRadius: '4px', borderBottom: '2px solid #f97316' }}>{part}</span> : 
+                        <span key={i}>{part}</span>
+                ))}
+            </>
+        );
+    };
 
     // Define filter configurations for each section
     const getFilterConfig = () => {
@@ -420,24 +460,37 @@ const GenericTable = ({ renderTableData, customData = null }) => {
             const lowerSearch = searchTerm.trim().toLowerCase();
             result = result.filter(item => {
                 // Combine visible fields that the user might want to search
-                const searchableFields = [item.name, item.employee_code, item.code];
+                const searchableFields = [
+                    item.name, 
+                    item.employee_code, 
+                    item.code, 
+                    item.address, 
+                    item.district_name, 
+                    item.mandal_name, 
+                    item.state_name,
+                    item.title
+                ];
 
                 return searchableFields.some(field => {
                     if (!field) return false;
                     const fieldVal = field.toString().toLowerCase().trim();
-                    // Match ONLY from the first letter (Starts With)
-                    return fieldVal.startsWith(lowerSearch);
+                    
+                    // PREFERENCE: 'Starts With' is prioritized, but 'Contains' is the fallback
+                    // This satisfies the user's need to find "Production" for "Pr" 
+                    // while also finding "AP104..."
+                    return fieldVal.includes(lowerSearch);
                 });
             });
         }
 
         // Status filter: Proceed with local filtering as a second pass/fallback
-        if (statusFilter !== 'all') {
+        // ONLY if not a server-filtered section to avoid logic mismatches
+        if (!isServerSection && statusFilter !== 'all') {
             result = result.filter(item => (item.status || 'Active') === statusFilter);
         }
 
         // Office filter
-        if (officeFilter !== 'all') {
+        if (!isServerSection && officeFilter !== 'all') {
             result = result.filter(item => {
                 // For Employees: Look up via positions_details
                 if (activeSection === 'employees' && item.positions_details) {
@@ -465,7 +518,7 @@ const GenericTable = ({ renderTableData, customData = null }) => {
         }
 
         // Department filter
-        if (departmentFilter !== 'all') {
+        if (!isServerSection && departmentFilter !== 'all') {
             result = result.filter(item => {
                 if (matchesId(item.department, departmentFilter) || matchesId(item.department_id, departmentFilter)) return true;
 
@@ -479,7 +532,7 @@ const GenericTable = ({ renderTableData, customData = null }) => {
         }
 
         // Section filter
-        if (sectionFilter !== 'all') {
+        if (!isServerSection && sectionFilter !== 'all') {
             result = result.filter(item => {
                 if (matchesId(item.section, sectionFilter) || matchesId(item.section_id, sectionFilter)) return true;
 
@@ -502,7 +555,7 @@ const GenericTable = ({ renderTableData, customData = null }) => {
         if (roleFilter !== 'all') {
             result = result.filter(item => matchesHierarchy(item, 'all', 'all', roleFilter, 'all'));
         }
-        if (jobFilter !== 'all') {
+        if (!isServerSection && jobFilter !== 'all') {
             result = result.filter(item => matchesHierarchy(item, 'all', 'all', 'all', jobFilter));
         }
 
@@ -567,7 +620,7 @@ const GenericTable = ({ renderTableData, customData = null }) => {
         }
 
         // Office Level Filter
-        if (officeLevelFilter !== 'all') {
+        if (!isServerSection && officeLevelFilter !== 'all') {
             const selectedLevelObj = (orgLevels || []).find(l => matchesId(l.id, officeLevelFilter));
             const selectedLevelName = selectedLevelObj ? selectedLevelObj.name : '';
 
@@ -658,7 +711,7 @@ const GenericTable = ({ renderTableData, customData = null }) => {
         });
 
         // Position Level Filter
-        if (positionLevelFilter !== 'all') {
+        if (!isServerSection && positionLevelFilter !== 'all') {
             result = result.filter(item =>
                 matchesId(item.level, positionLevelFilter) ||
                 matchesId(item.level_id, positionLevelFilter)
@@ -749,6 +802,8 @@ const GenericTable = ({ renderTableData, customData = null }) => {
                             onClick={(e) => {
                                 e.stopPropagation();
                                 const initialData = {};
+                                if (continentFilter !== 'all') initialData.continent = continentFilter;
+                                if (countryFilter !== 'all') initialData.country = countryFilter;
                                 if (mandalFilter !== 'all') initialData.mandal = mandalFilter;
                                 if (districtFilter !== 'all') initialData.district = districtFilter;
                                 if (stateFilter !== 'all') initialData.state = stateFilter;
@@ -762,7 +817,8 @@ const GenericTable = ({ renderTableData, customData = null }) => {
                             <Plus size={18} /> Add New
                         </button>
                     )}
-                    {['geo-continents', 'geo-countries', 'geo-states', 'geo-districts', 'geo-mandals', 'geo-clusters'].includes(activeSection) && canCreate(activeSection) && (
+                    {['employees', 'positions', 'geo-continents', 'geo-countries', 'geo-states', 'geo-districts', 'geo-mandals', 'geo-clusters'].includes(activeSection) && canCreate(activeSection) && (
+
                         <button
                             type="button"
                             className="btn-success"
@@ -784,6 +840,8 @@ const GenericTable = ({ renderTableData, customData = null }) => {
                             <Upload size={18} /> Bulk Import
                         </button>
                     )}
+
+
                 </div>
             </header>
 
@@ -807,11 +865,24 @@ const GenericTable = ({ renderTableData, customData = null }) => {
                                 type="text"
                                 placeholder="Search records..."
                                 value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
+                                maxLength={30}
+                                onChange={(e) => {
+                                    const raw = e.target.value;
+                                    let errorMsg = '';
+                                    if (raw.length >= 30) {
+                                        errorMsg = 'Maximum limit of 30 characters reached';
+                                    } else if (/[^a-zA-Z0-9\- ]/.test(raw)) {
+                                        errorMsg = 'Special characters not allowed in filters';
+                                    }
+                                    setSearchError(errorMsg);
+                                    
+                                    const sanitized = raw.replace(/[^a-zA-Z0-9\- ]/g, '');
+                                    setSearchTerm(sanitized);
+                                }}
                                 style={{
                                     width: '100%',
                                     padding: '10px 12px 10px 38px',
-                                    border: '2px solid #f1f5f9',
+                                    border: searchError ? '2px solid #ef4444' : '2px solid #f1f5f9',
                                     borderRadius: '12px',
                                     fontSize: '0.85rem',
                                     fontWeight: 600,
@@ -820,6 +891,11 @@ const GenericTable = ({ renderTableData, customData = null }) => {
                                     background: '#f8fafc'
                                 }}
                             />
+                            {searchError && (
+                                <div style={{ color: '#ef4444', fontSize: '0.7rem', fontWeight: 600, marginTop: '4px', position: 'absolute' }}>
+                                    {searchError}
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -1010,7 +1086,10 @@ const GenericTable = ({ renderTableData, customData = null }) => {
                             {(() => {
                                 const filteredSecs = (sections || [])
                                     .filter(s => {
-                                        const matchDept = departmentFilter === 'all' || s.department == departmentFilter || s.department_id == departmentFilter;
+                                        const sDeptId = (s.department && typeof s.department === 'object') ? s.department.id : s.department;
+                                        const sDeptIdFinal = s.department_id || sDeptId;
+                                        const matchDept = departmentFilter === 'all' || 
+                                                        String(sDeptIdFinal) === String(departmentFilter);
 
                                         // Improve office match by looking up department if needed
                                         let matchOffice = officeFilter === 'all';
@@ -1319,29 +1398,6 @@ const GenericTable = ({ renderTableData, customData = null }) => {
                             )}
                         </select>
                     )}
-                    {filterConfig.includes('section') && (
-                        <select
-                            value={sectionFilter}
-                            onChange={(e) => setSectionFilter(e.target.value)}
-                            disabled={filterConfig.includes('department') && departmentFilter === 'all'}
-                            style={{ padding: '10px 12px', border: '2px solid #f1f5f9', borderRadius: '12px', fontSize: '0.85rem', fontWeight: 600, outline: 'none', opacity: (filterConfig.includes('department') && departmentFilter === 'all') ? 0.6 : 1 }}
-                        >
-                            <option value="all">All Sections</option>
-                            {(() => {
-                                const filteredSecs = (sections || []).filter(s => {
-                                    const matchDept = departmentFilter === 'all' || matchesId(s.department, departmentFilter) || matchesId(s.department_id, departmentFilter);
-                                    const matchOffice = officeFilter === 'all' || matchesId(s.office_id, officeFilter) || (s.department_details && matchesId(s.department_details.office_id, officeFilter));
-                                    const matchLevel = officeLevelFilter === 'all' || matchesId(s.office_level_id, officeLevelFilter);
-                                    return matchDept && matchOffice && matchLevel;
-                                });
-                                return filteredSecs.length > 0 ? (
-                                    filteredSecs.map(s => <option key={s.id} value={s.id}>{s.name}</option>)
-                                ) : (
-                                    <option disabled>No data found</option>
-                                );
-                            })()}
-                        </select>
-                    )}
 
                     {/* Search moved to top */}
                     <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gridColumn: '1 / -1', justifyContent: 'flex-end', paddingTop: '0.5rem', borderTop: '1px solid #f1f5f9', marginTop: '0.5rem', gap: '12px' }}>
@@ -1449,7 +1505,7 @@ const GenericTable = ({ renderTableData, customData = null }) => {
                                             {groupHeader}
                                             {subGroupHeader}
                                             <tr className="fade-in">
-                                                {renderTableData(item, { clusterType: clusterTypeFilter })}
+                                                {renderTableData(item, { clusterType: clusterTypeFilter, searchTerm, HighlightTerm })}
                                                 {activeSection !== 'login-hits' && (
                                                     <>
                                                         {!activeSection.startsWith('geo-') && (

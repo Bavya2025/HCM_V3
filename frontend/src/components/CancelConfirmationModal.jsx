@@ -98,24 +98,18 @@ const CancelConfirmationModal = () => {
                 </div>
 
                 <button
+                    type="button"
+                    className="btn-close"
                     style={{
                         position: 'absolute',
                         top: '1.25rem',
                         right: '1.25rem',
-                        background: '#f1f5f9',
-                        border: 'none',
-                        color: '#64748b',
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '50%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer'
+                        padding: '6px 12px',
+                        fontSize: '0.75rem'
                     }}
                     onClick={() => setShowCancelModal(false)}
                 >
-                    <X size={18} />
+                    <X size={14} /> CLOSE
                 </button>
             </div>
         </div>

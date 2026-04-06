@@ -25,13 +25,19 @@ const Projects = () => {
         );
     }, [openProject, unitsSearchTerm]);
 
-    const renderTableData = React.useCallback((item) => (
+    const renderTableData = React.useCallback((item, { searchTerm, HighlightTerm }) => (
         <>
             <td style={{ paddingLeft: '2.5rem' }}>
-                <div style={{ fontWeight: 800, color: '#1e293b', fontSize: '1rem' }}>{item.name}</div>
+                <div style={{ fontWeight: 800, color: '#1e293b', fontSize: '1rem' }}>
+                    <HighlightTerm text={item.name} term={searchTerm} />
+                </div>
                 <div style={{ fontSize: '0.75rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-                    <span style={{ fontWeight: 700, background: '#f8fafc', padding: '2px 8px', borderRadius: '6px' }}>{item.code}</span>
-                    <span style={{ fontWeight: 600 }}>{item.assigned_level_name || 'Global'}</span>
+                    <span style={{ fontWeight: 700, background: '#f8fafc', padding: '2px 8px', borderRadius: '6px' }}>
+                        <HighlightTerm text={item.code} term={searchTerm} />
+                    </span>
+                    <span style={{ fontWeight: 600 }}>
+                        <HighlightTerm text={item.assigned_level_name || 'Global'} term={searchTerm} />
+                    </span>
                     <span style={{ fontWeight: 600, background: '#eff6ff', color: '#1e40af', padding: '2px 8px', borderRadius: '6px' }}>{item.project_type_display}</span>
                     {item.assigned_offices_details?.length > 0 && (
                         <div

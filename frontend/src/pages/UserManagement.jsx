@@ -12,7 +12,16 @@ const UserManagement = () => {
     const getInitialFilters = () => {
         const saved = sessionStorage.getItem(`filters_users`);
         if (saved) {
-            try { return JSON.parse(saved); } catch (e) { }
+            try {
+                const parsed = JSON.parse(saved);
+                // HEAL STALE FILTERS: If levelFilter is a name from an older version, reset it.
+                if (parsed.levelFilter && isNaN(parsed.levelFilter) && parsed.levelFilter !== 'all') {
+                    parsed.levelFilter = 'all';
+                    parsed.officeFilter = 'all';
+                    parsed.deptFilter = 'all';
+                }
+                return parsed;
+            } catch (e) { }
         }
         return {
             searchTerm: '',
@@ -30,6 +39,7 @@ const UserManagement = () => {
     const [selectedEmployee, setSelectedEmployee] = useState(null);
     const [view, setView] = useState('list'); // 'list' or 'permissions'
     const [processingId, setProcessingId] = useState(null);
+    const [searchError, setSearchError] = useState('');
 
     // Save filters
     useEffect(() => {
@@ -122,7 +132,8 @@ const UserManagement = () => {
     }, [searchTerm, levelFilter, officeFilter, deptFilter]);
 
     const handleToggleStatus = async (employee) => {
-        const newStatus = (employee.status === 'Active' || employee.status === 'Suspicious') ? 'Inactive' : 'Active';
+        const currentStatus = employee.status ? employee.status.trim().toLowerCase() : '';
+        const newStatus = (currentStatus === 'active' || currentStatus === 'suspicious') ? 'Inactive' : 'Active';
         try {
             await api.patch(`employees/${employee.id}`, { status: newStatus });
             setEmployees(employees.map(e => e.id === employee.id ? { ...e, status: newStatus } : e));
@@ -135,27 +146,7 @@ const UserManagement = () => {
     const filteredEmployees = employees.filter(e => {
         // Exclude root admin
         if (e.employee_code === 'ADM-001') return false;
-
-        // Local Filter Fallback (Ensures UI matches filters even if backend is syncing)
-        const search = searchTerm.toLowerCase();
-        const matchesSearch = !searchTerm ||
-            e.name?.toLowerCase().startsWith(search) ||
-            e.employee_code?.toLowerCase().startsWith(search) ||
-            e.positions_details?.some(p =>
-                p.name?.toLowerCase().startsWith(search) ||
-                p.role_name?.toLowerCase().startsWith(search)
-            );
-
-        const matchesLevel = levelFilter === 'all' ||
-            e.positions_details?.some(p => p.office_level === levelFilter);
-
-        const matchesOffice = officeFilter === 'all' ||
-            e.positions_details?.some(p => p.office_id?.toString() === officeFilter);
-
-        const matchesDept = deptFilter === 'all' ||
-            e.positions_details?.some(p => p.department_id?.toString() === deptFilter);
-
-        return matchesSearch && matchesLevel && matchesOffice && matchesDept;
+        return true;
     }).sort((a, b) => a.name.localeCompare(b.name));
 
     if (view === 'permissions' && selectedEmployee) {
@@ -205,10 +196,28 @@ const UserManagement = () => {
                         <input
                             type="text"
                             placeholder="Name or Employee Code..."
-                            style={{ width: '100%', padding: '10px 10px 10px 40px', border: '2px solid #f1f5f9', borderRadius: '12px', fontSize: '0.85rem', outline: 'none' }}
+                            style={{ width: '100%', padding: '10px 10px 10px 40px', border: searchError ? '2px solid #ef4444' : '2px solid #f1f5f9', borderRadius: '12px', fontSize: '0.85rem', outline: 'none' }}
                             value={searchTerm}
-                            onChange={(e) => updateFilter({ searchTerm: e.target.value })}
+                            maxLength={30}
+                            onChange={(e) => {
+                                const raw = e.target.value;
+                                let errorMsg = '';
+                                if (raw.length >= 30) {
+                                    errorMsg = 'Maximum limit of 30 characters reached';
+                                } else if (/[^a-zA-Z0-9\- ]/.test(raw)) {
+                                    errorMsg = 'Special characters not allowed in filters';
+                                }
+                                setSearchError(errorMsg);
+                                
+                                const sanitized = raw.replace(/[^a-zA-Z0-9\- ]/g, '');
+                                updateFilter({ searchTerm: sanitized });
+                            }}
                         />
+                        {searchError && (
+                            <div style={{ color: '#ef4444', fontSize: '0.7rem', fontWeight: 600, marginTop: '4px', position: 'absolute' }}>
+                                {searchError}
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -223,7 +232,7 @@ const UserManagement = () => {
                     >
                         <option value="all">All Levels</option>
                         {orgLevels.map(l => (
-                            <option key={l.id} value={l.name}>{l.name}</option>
+                            <option key={l.id} value={l.id}>{l.name}</option>
                         ))}
                     </select>
                 </div>
@@ -239,7 +248,7 @@ const UserManagement = () => {
                     >
                         <option value="all">All Offices</option>
                         {offices
-                            .filter(o => levelFilter === 'all' || o.level_name === levelFilter)
+                            .filter(o => levelFilter === 'all' || String(o.level) === String(levelFilter) || String(o.level_id) === String(levelFilter))
                             .map(o => (
                                 <option key={o.id} value={o.id}>{o.name}</option>
                             ))}
@@ -256,7 +265,7 @@ const UserManagement = () => {
                         <option value="all">All Departments</option>
                         {departments
                             .filter(d => (officeFilter === 'all' || d.office?.toString() === officeFilter || d.office_id?.toString() === officeFilter) &&
-                                (levelFilter === 'all' || d.office_level === levelFilter))
+                                (levelFilter === 'all' || String(d.office_level_id) === String(levelFilter)))
                             .map(d => (
                                 <option key={d.id} value={d.id}>{d.name}</option>
                             ))}
@@ -305,7 +314,11 @@ const UserManagement = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredEmployees.map((emp) => (
+                        {filteredEmployees.map((emp) => {
+                            const isActive = emp.status && emp.status.trim().toLowerCase() === 'active';
+                            const isSuspicious = emp.status && emp.status.trim().toLowerCase() === 'suspicious';
+                            
+                            return (
                             <tr key={emp.id} className="stagger-in">
                                 <td>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -354,17 +367,17 @@ const UserManagement = () => {
                                         borderRadius: '20px',
                                         fontSize: '0.7rem',
                                         fontWeight: 800,
-                                        background: emp.status === 'Active' ? '#f0fdf4' : '#fef2f2',
-                                        color: emp.status === 'Active' ? '#166534' : '#991b1b',
-                                        border: `1px solid ${emp.status === 'Active' ? '#dcfce7' : '#fee2e2'}`
+                                        background: isActive ? '#f0fdf4' : '#fef2f2',
+                                        color: isActive ? '#166534' : '#991b1b',
+                                        border: `1px solid ${isActive ? '#dcfce7' : '#fee2e2'}`
                                     }}>
                                         <div style={{
                                             width: '6px',
                                             height: '6px',
                                             borderRadius: '50%',
-                                            background: emp.status === 'Active' ? '#22c55e' : '#ef4444'
+                                            background: isActive ? '#22c55e' : '#ef4444'
                                         }}></div>
-                                        {emp.status.toUpperCase()}
+                                        {emp.status ? emp.status.toUpperCase() : 'UNKNOWN'}
                                     </div>
                                 </td>
                                 <td style={{ textAlign: 'right' }}>
@@ -435,22 +448,23 @@ const UserManagement = () => {
                                                     padding: '6px 12px',
                                                     fontSize: '0.75rem',
                                                     fontWeight: 700,
-                                                    color: (emp.status === 'Active' || emp.status === 'Suspicious') ? '#ef4444' : '#166534',
-                                                    background: (emp.status === 'Active' || emp.status === 'Suspicious') ? '#fff1f2' : '#dcfce7',
-                                                    border: `1px solid ${(emp.status === 'Active' || emp.status === 'Suspicious') ? '#fee2e2' : '#bbf7d0'}`,
+                                                    color: (isActive || isSuspicious) ? '#ef4444' : '#166534',
+                                                    background: (isActive || isSuspicious) ? '#fff1f2' : '#dcfce7',
+                                                    border: `1px solid ${(isActive || isSuspicious) ? '#fee2e2' : '#bbf7d0'}`,
                                                     width: '100px',
                                                     justifyContent: 'center'
                                                 }}
                                                 onClick={() => handleToggleStatus(emp)}
                                             >
-                                                {(emp.status === 'Active' || emp.status === 'Suspicious') ? <UserMinus size={14} /> : <UserCheck size={14} />}
-                                                {(emp.status === 'Active' || emp.status === 'Suspicious') ? 'Disable' : 'Enable'}
+                                                {(isActive || isSuspicious) ? <UserMinus size={14} /> : <UserCheck size={14} />}
+                                                {(isActive || isSuspicious) ? 'Disable' : 'Enable'}
                                             </button>
                                         )}
                                     </div>
                                 </td>
                             </tr>
-                        ))}
+                        );
+                        })}
                     </tbody>
                 </table>
             </div>

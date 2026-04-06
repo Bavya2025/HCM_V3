@@ -21,7 +21,7 @@ const Employees = () => {
 
 
 
-    const renderTableData = React.useCallback((item) => (
+    const renderTableData = React.useCallback((item, { searchTerm, HighlightTerm }) => (
         <>
             <td style={{ cursor: 'pointer' }} onClick={() => handleViewProfile(item.id)}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -51,12 +51,16 @@ const Employees = () => {
                         )}
                     </div>
                     <div>
-                        <div style={{ fontWeight: 800, fontSize: '1rem', color: '#1e293b' }}>{item.name}</div>
+                        <div style={{ fontWeight: 800, fontSize: '1rem', color: '#1e293b' }}>
+                            <HighlightTerm text={item.name} term={searchTerm} />
+                        </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-                            <span style={{ fontSize: '0.7rem', fontWeight: 700, background: '#f8fafc', padding: '2px 8px', borderRadius: '6px', color: '#64748b', border: '1px solid #fde6cd' }}>{item.employee_code}</span>
+                            <span style={{ fontSize: '0.7rem', fontWeight: 700, background: '#f8fafc', padding: '2px 8px', borderRadius: '6px', color: '#64748b', border: '1px solid #fde6cd' }}>
+                                <HighlightTerm text={item.employee_code} term={searchTerm} />
+                            </span>
                             <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>•</span>
                             <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <Briefcase size={12} /> {item.positions_details?.length > 0 ? item.positions_details.map(p => p.name).join(', ') : 'Unassigned'}
+                                <Briefcase size={12} /> <HighlightTerm text={item.positions_details?.length > 0 ? item.positions_details.map(p => p.name).join(', ') : 'Unassigned'} term={searchTerm} />
                             </span>
                         </div>
                     </div>

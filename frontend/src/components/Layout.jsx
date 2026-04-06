@@ -98,7 +98,9 @@ const Layout = ({ children }) => {
                             <h2 className="section-title" style={{ margin: 0, background: 'var(--sunset)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                                 {formData.id ? 'Edit' : 'Add New'} {modalType}
                             </h2>
-                            <X size={24} color="var(--primary)" style={{ cursor: 'pointer' }} onClick={closeModal} />
+                            <button type="button" className="btn-close" onClick={closeModal} style={{ padding: '6px 12px', fontSize: '0.75rem' }}>
+                                <X size={14} /> CLOSE
+                            </button>
                         </div>
 
                         <form onSubmit={handleFormSubmit} style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', overflow: 'hidden' }}>

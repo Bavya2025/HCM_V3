@@ -87,6 +87,18 @@ class UserSerializer(serializers.ModelSerializer):
                 pass 
         return user
 
+class PositionLevelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PositionLevel
+        fields = '__all__'
+
+    def validate_rank(self, value):
+        if value < 0:
+            raise serializers.ValidationError("Rank cannot be negative.")
+        if value > 15:
+            raise serializers.ValidationError("Rank cannot exceed 15.")
+        return value
+
 class GeoContinentSerializer(serializers.ModelSerializer):
     class Meta:
         model = GeoContinent
@@ -207,7 +219,9 @@ class VisitingLocationSerializer(serializers.ModelSerializer):
 
     def get_office_type(self, obj):
         if not obj.office_ref or not obj.office_ref.level: return "OFFICE"
-        return "FACILITY" if obj.office_ref.level.name.upper() == "FACILITY" else "OFFICE"
+        level_name = obj.office_ref.level.name.upper()
+        return "FACILITY" if level_name in ("FACILITY", "FACILITATE") else "OFFICE"
+
 
     class Meta:
         model = VisitingLocation
@@ -317,6 +331,29 @@ class OrganizationLevelSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrganizationLevel
         fields = '__all__'
+
+    def validate(self, data):
+        name = data.get('name')
+        level_code = data.get('level_code')
+        
+        qs = OrganizationLevel.objects.all()
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+            
+        if name and qs.filter(name__iexact=name).exists():
+            raise serializers.ValidationError({"name": "An Organization Level with this name already exists."})
+            
+        if level_code and qs.filter(level_code__iexact=level_code).exists():
+            raise serializers.ValidationError({"level_code": f"Level code '{level_code}' is already in use by another level."})
+            
+        rank = data.get('rank')
+        if rank is not None:
+            if rank < 0:
+                raise serializers.ValidationError({"rank": "Rank cannot be negative."})
+            if rank > 15:
+                raise serializers.ValidationError({"rank": "Rank cannot exceed 15."})
+                
+        return data
 
 class TaskUrlSerializer(serializers.ModelSerializer):
     task_name = serializers.ReadOnlyField(source='task.name')
@@ -429,8 +466,18 @@ class JobFamilySerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class FacilityMasterSerializer(serializers.ModelSerializer):
-    project_name = serializers.ReadOnlyField(source='project.name')
-    project_code = serializers.ReadOnlyField(source='project.code')
+    project_name = serializers.SerializerMethodField()
+    project_code = serializers.SerializerMethodField()
+
+    def get_project_name(self, obj):
+        if obj.project and obj.project.is_currently_active:
+            return obj.project.name
+        return None
+
+    def get_project_code(self, obj):
+        if obj.project and obj.project.is_currently_active:
+            return obj.project.code
+        return None
     life_display = serializers.CharField(source='get_life_display', read_only=True)
     mode_display = serializers.CharField(source='get_mode_display', read_only=True)
     project_type_display = serializers.CharField(source='get_project_type_display', read_only=True)
@@ -449,8 +496,24 @@ class OfficeSerializer(serializers.ModelSerializer):
     hierarchy_path = serializers.ReadOnlyField()
     cluster_name = serializers.ReadOnlyField(source='cluster.name')
     cluster_type = serializers.ReadOnlyField(source='cluster.get_cluster_type_display')
-    assigned_projects = serializers.StringRelatedField(source='projects', many=True, read_only=True)
+    assigned_projects = serializers.SerializerMethodField()
     project_ids = serializers.PrimaryKeyRelatedField(source='projects', many=True, read_only=True)
+    project_code = serializers.SerializerMethodField()
+    project_name = serializers.SerializerMethodField()
+
+    def get_assigned_projects(self, obj):
+        # Automatically hide expired/inactive projects from UI tags
+        return [p.name for p in obj.projects.all() if p.is_currently_active]
+
+    def get_project_code(self, obj):
+        proj = obj.projects.all()
+        active_proj = next((p for p in proj if p.is_currently_active), None)
+        return active_proj.code if active_proj else None
+
+    def get_project_name(self, obj):
+        proj = obj.projects.all()
+        active_proj = next((p for p in proj if p.is_currently_active), None)
+        return active_proj.name if active_proj else None
     
     facility_master_details = FacilityMasterSerializer(source='facility_master', read_only=True)
     
@@ -486,14 +549,25 @@ class LightOfficeSerializer(serializers.ModelSerializer):
     level_display = serializers.ReadOnlyField(source='level.name')
     parent_id = serializers.PrimaryKeyRelatedField(source='parent', read_only=True)
     project_ids = serializers.PrimaryKeyRelatedField(source='projects', many=True, read_only=True)
+    project_code = serializers.SerializerMethodField()
+    project_name = serializers.SerializerMethodField()
+
+    def get_project_code(self, obj):
+        proj = obj.projects.first()
+        return proj.code if proj else None
+
+    def get_project_name(self, obj):
+        proj = obj.projects.first()
+        return proj.name if proj else None
 
     class Meta:
         model = Office
         fields = [
             'id', 'name', 'code', 'parent', 'parent_id', 'level', 'level_name', 'level_code', 
             'level_display', 'status', 'country_name', 'state_name', 'district_name', 'mandal_name',
-            'address', 'phone', 'email', 'location', 'facility_master', 'cluster',
-            'registered_name', 'din_no', 'register_id', 'status_date', 'start_date', 'project_ids'
+            'address', 'latitude', 'longitude', 'phone', 'email', 'location', 'facility_master', 'cluster',
+            'registered_name', 'din_no', 'register_id', 'status_date', 'start_date', 'project_ids',
+            'project_code', 'project_name'
         ]
 
 class FacilitySerializer(serializers.ModelSerializer):
@@ -521,7 +595,12 @@ class SectionSerializer(serializers.ModelSerializer):
     office_level = serializers.ReadOnlyField(source='department.office.level.name')
     office_level_id = serializers.ReadOnlyField(source='department.office.level.id')
     office_is_facility = serializers.ReadOnlyField(source='department.office.is_facility')
-    project_name = serializers.ReadOnlyField(source='project.name')
+    project_name = serializers.SerializerMethodField()
+
+    def get_project_name(self, obj):
+        if obj.project and obj.project.is_currently_active:
+            return obj.project.name
+        return None
     
     class Meta:
         model = Section
@@ -534,7 +613,13 @@ class DepartmentSerializer(serializers.ModelSerializer):
     office_is_facility = serializers.ReadOnlyField(source='office.is_facility')
     office_state = serializers.ReadOnlyField(source='office.state_name')
     office_district = serializers.ReadOnlyField(source='office.district_name')
-    project_name = serializers.ReadOnlyField(source='project.name')
+    project_name = serializers.SerializerMethodField()
+
+    def get_project_name(self, obj):
+        if obj.project and obj.project.is_currently_active:
+            return obj.project.name
+        return None
+
     sections = SectionSerializer(many=True, read_only=True)
     
     class Meta:
@@ -595,10 +680,14 @@ class PositionDetailSerializer(serializers.ModelSerializer):
         return None
 
     def get_project_name(self, obj):
+        project = None
         if obj.section and obj.section.project:
-            return obj.section.project.name
-        if obj.department and obj.department.project:
-            return obj.department.project.name
+            project = obj.section.project
+        elif obj.department and obj.department.project:
+            project = obj.department.project
+        
+        if project and project.is_currently_active:
+            return project.name
         return None
     
     class Meta:
@@ -675,10 +764,14 @@ class PositionSerializer(serializers.ModelSerializer):
     project_name = serializers.SerializerMethodField()
 
     def get_project_name(self, obj):
+        project = None
         if obj.section and obj.section.project:
-            return obj.section.project.name
-        if obj.department and obj.department.project:
-            return obj.department.project.name
+            project = obj.section.project
+        elif obj.department and obj.department.project:
+            project = obj.department.project
+        
+        if project and project.is_currently_active:
+            return project.name
         return None
 
     def get_assigned_employee(self, obj):
@@ -713,13 +806,16 @@ class PositionDropdownSerializer(serializers.ModelSerializer):
     office_level_id = serializers.SerializerMethodField()
     office_name = serializers.ReadOnlyField(source='office.name', allow_null=True)
     department_name = serializers.ReadOnlyField(source='department.name', allow_null=True)
+    level_id = serializers.IntegerField(source='level.id', allow_null=True, read_only=True)
+    role_name = serializers.ReadOnlyField(source='role.name', allow_null=True)
 
     class Meta:
         model = Position
         fields = [
             'id', 'name', 'code', 'status', 
             'office_id', 'department_id', 'section_id', 
-            'office_name', 'department_name', 'office_level_id'
+            'office_name', 'department_name', 'office_level_id',
+            'level_id', 'role_name'
         ]
 
     def get_office_level_id(self, obj):
@@ -797,13 +893,18 @@ class EmployeeSerializer(serializers.ModelSerializer):
     location_details = serializers.SerializerMethodField()
 
     def get_project_name(self, obj):
-        # Get project name from the first position that has one
+        # Get project name from the first position that has an ACTIVE project
         pos = obj.positions.first()
         if not pos: return None
+        
+        project = None
         if pos.section and pos.section.project:
-            return pos.section.project.name
-        if pos.department and pos.department.project:
-            return pos.department.project.name
+            project = pos.section.project
+        elif pos.department and pos.department.project:
+            project = pos.department.project
+            
+        if project and project.is_currently_active:
+            return project.name
         return None
 
     def get_location_details(self, obj):
@@ -1002,9 +1103,8 @@ class EmployeeListSerializer(EmployeeSerializer):
 
     class Meta:
         model = Employee
-        fields = EmployeeSerializer.Meta.fields + [
-            'positions_details', 'project_name', 'location_details', 'primary_position'
-        ]
+        # Filter out heavy fields like 'photo' to keep list responses fast and avoid duplication errors
+        fields = [f for f in EmployeeSerializer.Meta.fields if f != 'photo']
 
     def to_representation(self, instance):
         # Inherit from EmployeeSerializer (which now handles pan/aadhar)

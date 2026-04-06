@@ -14,6 +14,23 @@ const TopNav = () => {
     const [showSwitcher, setShowSwitcher] = React.useState(false);
     const [profileMenuOpen, setProfileMenuOpen] = React.useState(false);
 
+    const profileRef = React.useRef(null);
+    const switcherRef = React.useRef(null);
+
+    React.useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (profileRef.current && !profileRef.current.contains(event.target)) {
+                setProfileMenuOpen(false);
+            }
+            if (switcherRef.current && !switcherRef.current.contains(event.target)) {
+                setShowSwitcher(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+
     // Determine Display Name
     const displayName = user?.employee_name || user?.username || "Guest User";
     const actingAs = user?.acting_as;
@@ -39,7 +56,7 @@ const TopNav = () => {
 
             <div className="top-nav-actions">
                 {user?.active_assignments?.length > 0 && (
-                    <div style={{ position: 'relative' }}>
+                    <div ref={switcherRef} style={{ position: 'relative' }}>
                         <button
                             onClick={() => setShowSwitcher(!showSwitcher)}
                             className="premium-tag"
@@ -62,11 +79,6 @@ const TopNav = () => {
                         </button>
 
                         {showSwitcher && (
-                            <>
-                                <div
-                                    style={{ position: 'fixed', inset: 0, zIndex: 90 }}
-                                    onClick={() => setShowSwitcher(false)}
-                                />
                                 <div style={{
                                     position: 'absolute',
                                     top: '45px',
@@ -123,16 +135,16 @@ const TopNav = () => {
                                         </button>
                                     ))}
                                 </div>
-                            </>
                         )}
                     </div>
                 )}
 
-                <div
-                    className="user-profile"
-                    style={{ cursor: 'pointer', position: 'relative' }}
-                    onClick={() => setProfileMenuOpen(!profileMenuOpen)}
-                >
+                <div ref={profileRef} style={{ position: 'relative' }}>
+                    <div
+                        className="user-profile"
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => setProfileMenuOpen(!profileMenuOpen)}
+                    >
                     <div className="user-avatar" style={{
                         background: user?.is_superuser ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'var(--primary)',
                         overflow: 'hidden',
@@ -156,13 +168,9 @@ const TopNav = () => {
                         <div className="user-name">{finalDisplayName}</div>
                         <div className="user-role">{displayRole}</div>
                     </div>
+                </div>
 
                     {profileMenuOpen && (
-                        <>
-                            <div
-                                style={{ position: 'fixed', inset: 0, zIndex: 90 }}
-                                onClick={(e) => { e.stopPropagation(); setProfileMenuOpen(false); }}
-                            />
                             <div className="fade-in" style={{
                                 position: 'absolute',
                                 top: '55px',
@@ -239,7 +247,6 @@ const TopNav = () => {
                                     </button>
                                 </div>
                             </div>
-                        </>
                     )}
                 </div>
             </div>

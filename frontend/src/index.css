@@ -56,6 +56,31 @@ body {
   letter-spacing: -0.01em;
 }
 
+/* ─── Global Auto-Capitalize: first letter of every word in all text inputs ─── */
+input[type="text"],
+input[type="tel"],
+input[type="url"],
+input:not([type]),
+textarea {
+  text-transform: capitalize;
+}
+
+/* Keep these fields as-is (no capitalize) */
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="search"],
+input[type="date"],
+input[type="time"],
+input[type="file"],
+input[type="hidden"],
+input[type="checkbox"],
+input[type="radio"] {
+  text-transform: none;
+}
+/* ─────────────────────────────────────────────────────────────────────────── */
+
+
 /* Premium Glassmorphism */
 .glass {
   background: var(--glass-bg);
@@ -1416,6 +1441,33 @@ select.form-input {
     opacity: 1;
     transform: scale(1);
   }
+}
+
+.btn-close {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #fff1f2;
+  color: #be185d;
+  border: 1px solid #fecdd3;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  line-height: normal;
+}
+
+.btn-close:hover {
+  background: #be185d;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(190, 24, 93, 0.2);
+}
+
+.btn-close:active {
+  transform: translateY(0);
 }
 
 

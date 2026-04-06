@@ -140,13 +140,62 @@ const ModalForm = () => {
     React.useEffect(() => {
         if (modalType === 'Offices' && formData.level && !formData.id) {
             const lvl = orgLevels?.find(l => String(l.id) === String(formData.level));
-            if (lvl && lvl.level_code !== 'L9' && (!formData.code || formData.code === '')) {
-                const initials = lvl.name.split(' ').map(n => n[0]).join('').toUpperCase();
-                const autoCode = `${initials}-`;
+            if (lvl && (!formData.code || formData.code === '')) {
+                let projectPart = '';
+                
+                // For L9, pull from Facility Master project
+                if (lvl.level_code === 'L9' && formData.facility_master) {
+                    const master = facilityMasters?.find(m => String(m.id) === String(formData.facility_master));
+                    if (master) {
+                        // Use project_code from master if available (e.g. "108-OPS")
+                        projectPart = master.project_code || '';
+                    }
+                } 
+                // For others, check parent's project association if possible
+                else if (formData.parent) {
+                    const parentOffice = offices?.find(o => String(o.id) === String(formData.parent));
+                    if (parentOffice) {
+                        // Use the project_code tagged to the parent office
+                        projectPart = parentOffice.project_code || '';
+                        
+                        // Fallback if project_code isn't directly available (legacy records)
+                        if (!projectPart) {
+                            const codeParts = (parentOffice.code || '').split('-');
+                            if (codeParts.length >= 2) {
+                                projectPart = `${codeParts[0]}-${codeParts[1]}`;
+                            } else {
+                                projectPart = codeParts[0] || '';
+                            }
+                        }
+                    }
+                }
+
+                let levelPart = (lvl.level_code || '').toLowerCase();
+                
+                // Convert L-codes to meaningful abbreviations
+                const levelNameLower = (lvl.name || '').toLowerCase();
+                if (levelNameLower.includes('head office')) levelPart = 'ho';
+                else if (levelNameLower.includes('zonal office')) levelPart = 'zo';
+                else if (levelNameLower.includes('circle office')) levelPart = 'co';
+                else if (levelNameLower.includes('regional office')) levelPart = 'ro';
+                else if (levelNameLower.includes('divisional office')) levelPart = 'do';
+                else if (levelNameLower.includes('sub divisional office')) levelPart = 'sdo';
+                else if (levelNameLower.includes('section office')) levelPart = 'so';
+                else if (levelNameLower.includes('facility')) levelPart = 'fa';
+                else if (levelNameLower.includes('vertical')) levelPart = 've';
+                else {
+                    // Default to first letters if no specific match
+                    levelPart = lvl.name.split(' ').map(n => n[0]).join('').toLowerCase();
+                }
+                
+                // If we have a project part, the format is [Project]-[Level]-
+                // If not, just use [Level]-
+                const autoCode = projectPart ? `${projectPart}-${levelPart}-`.toUpperCase() : `${levelPart.toUpperCase()}-`;
+                
                 setFormData(prev => ({ ...prev, code: autoCode }));
             }
         }
-    }, [formData.level, orgLevels, modalType]);
+    }, [formData.level, formData.parent, formData.facility_master, orgLevels, offices, facilityMasters, modalType]);
 
     React.useEffect(() => {
         if (selectedProj && currentLevel?.level_code === 'L9') {
@@ -240,6 +289,30 @@ const ModalForm = () => {
             showValidationError(fieldName, 'Only letters and spaces allowed');
         }
         return capitalize(filtered).slice(0, maxLength);
+    };
+
+    const validateRank = (value, fieldName = 'rank') => {
+        // Allow only numbers and one decimal point
+        let filtered = value.replace(/[^0-9.]/g, '');
+        
+        // Handle multiple decimal points
+        const points = filtered.split('.');
+        if (points.length > 2) {
+            filtered = points[0] + '.' + points.slice(1).join('');
+        }
+
+        if (filtered !== value && fieldName) {
+            showValidationError(fieldName, 'Only positive numbers allowed');
+        }
+
+        const numVal = parseFloat(filtered);
+        
+        if (numVal > 15) {
+            showValidationError(fieldName, 'Maximum rank allowed is 15');
+            return '15';
+        }
+        
+        return filtered;
     };
 
     const validateAlphaNumeric = (value, maxLength = 200, fieldName = '') => {
@@ -344,19 +417,31 @@ const ModalForm = () => {
         if (modalType === 'Positions' && formData.id && !formData._pos_hydrated && (offices?.length > 0)) {
             const safeStr = (val) => (val === null || val === undefined) ? '' : String(val);
 
-            setFormData(prev => ({
-                ...prev,
-                _pos_hydrated: true,
-                _pos_level_filter: safeStr(prev.office_level_id || (prev.office?.level?.id) || prev.office_level),
-                office: safeStr(prev.office_id || (typeof prev.office === 'object' ? prev.office?.id : prev.office)),
-                _pos_office_filter: safeStr(prev.office_id || (typeof prev.office === 'object' ? prev.office?.id : prev.office)),
-                department: safeStr(prev.department_id || (typeof prev.department === 'object' ? prev.department?.id : prev.department)),
-                section: safeStr(prev.section_id || (typeof prev.section === 'object' ? prev.section?.id : prev.section)),
-                _pos_job_family_filter: safeStr(prev.job_family_id),
-                _pos_role_type_filter: safeStr(prev.role_type_id),
-                role: safeStr(prev.role_id || (typeof prev.role === 'object' ? prev.role?.id : prev.role)),
-                job: safeStr(prev.job_id || (typeof prev.job === 'object' ? prev.job?.id : prev.job))
-            }));
+            // Extract IDs robustly from various possible fields (backend often sends both objects and raw IDs)
+            const levelId = safeStr(formData.office_level_id || formData.office_level || (formData.office?.level?.id));
+            const officeId = safeStr(formData.office_id || (typeof formData.office === 'object' ? formData.office?.id : formData.office));
+            const deptId = safeStr(formData.department_id || (typeof formData.department === 'object' ? formData.department?.id : formData.department));
+            const sectId = safeStr(formData.section_id || (typeof formData.section === 'object' ? formData.section?.id : formData.section));
+            const jfId = safeStr(formData.job_family_id || (typeof formData.job_family === 'object' ? formData.job_family?.id : formData.job_family));
+            const rtId = safeStr(formData.role_type_id || (typeof formData.role_type === 'object' ? formData.role_type?.id : formData.role_type));
+            const roleId = safeStr(formData.role_id || (typeof formData.role === 'object' ? formData.role?.id : formData.role));
+            const jobId = safeStr(formData.job_id || (typeof formData.job === 'object' ? formData.job?.id : formData.job));
+
+            if (levelId || officeId) {
+                setFormData(prev => ({
+                    ...prev,
+                    _pos_hydrated: true,
+                    _pos_level_filter: levelId,
+                    office: officeId,
+                    _pos_office_filter: officeId,
+                    department: deptId,
+                    section: sectId,
+                    _pos_job_family_filter: jfId,
+                    _pos_role_type_filter: rtId,
+                    role: roleId,
+                    job: jobId
+                }));
+            }
         }
 
         // Hydrate Employees - Identity & Status
@@ -620,7 +705,7 @@ const ModalForm = () => {
                 }
             }
         }
-    }, [modalType, formData.id, formData.employee, formData._emp_hist_hydrated, formData.office, formData.parent, formData.role, formData.job, formData.country, formData.state, formData.district, formData.mandal, formData.cluster, selectedEmployee, allEmployees, offices, roles, roleTypes, jobs, geoContinents, geoCountries, geoStatesData, geoDistrictsData, geoMandals]);
+    }, [modalType, formData.id, formData.office_level, formData.office_level_id, formData.office_id, formData.department_id, formData.section_id, formData.employee, formData._emp_hist_hydrated, formData.office, formData.parent, formData.role, formData.job, formData.country, formData.state, formData.district, formData.mandal, formData.cluster, selectedEmployee, allEmployees, offices, roles, roleTypes, jobs, geoContinents, geoCountries, geoStatesData, geoDistrictsData, geoMandals]);
 
 
 
@@ -702,25 +787,54 @@ const ModalForm = () => {
     const getFilteredReportingPositions = () => {
         if (!positions) return [];
 
+        const currentPosId = Number(formData.id);
+        const assignedReportingIds = (formData.reporting_to || []).map(id => Number(id));
+
         // Start with filtered positions
         let filtered = positions
-            .filter(p => !formData.id || p.id != formData.id) // Exclude self
-            .filter(p => !formData._rep_level_filter || p.office_level_id == formData._rep_level_filter)
-            .filter(p => !formData._rep_office_filter || p.office == formData._rep_office_filter)
-            .filter(p => !formData._rep_pos_level_filter || p.level == formData._rep_pos_level_filter);
+            .filter(p => !currentPosId || Number(p.id) !== currentPosId) // Exclude self
+            .filter(p => !formData._rep_level_filter || Number(p.office_level_id) === Number(formData._rep_level_filter))
+            .filter(p => !formData._rep_office_filter || Number(p.office_id) === Number(formData._rep_office_filter))
+            .filter(p => !formData._rep_pos_level_filter || Number(p.level_id) === Number(formData._rep_pos_level_filter));
 
-        // Add currently assigned reporting positions that aren't in the filtered list
-        if (formData.reporting_to_details && formData.reporting_to_details.length > 0) {
-            const filteredIds = filtered.map(p => Number(p.id));
-            const assignedReportingIds = (formData.reporting_to || []).map(id => Number(id));
+        // CRITICAL FIX: Ensure currently assigned reporting positions ALWAYS appear in the list,
+        // even if they don't match the active Level/Office/Rank filters.
+        if (assignedReportingIds.length > 0) {
+            const filteredIds = new Set(filtered.map(p => Number(p.id)));
 
-            formData.reporting_to_details.forEach(assignedPos => {
-                // If this assigned reporting position isn't in the filtered list
-                if (!filteredIds.includes(Number(assignedPos.id)) && assignedReportingIds.includes(Number(assignedPos.id))) {
-                    console.log(`✅ Adding assigned reporting position not in list: ${assignedPos.name} (ID: ${assignedPos.id})`);
-                    filtered.push(assignedPos);
+            assignedReportingIds.forEach(id => {
+                if (!filteredIds.has(id)) {
+                    // Find the position in the full list to get its details
+                    const fullPosDoc = positions.find(p => Number(p.id) === id);
+                    if (fullPosDoc) {
+                        // console.log(`✅ [HierarchySync] Forcing inclusion of already-tagged position: ${fullPosDoc.name} (${fullPosDoc.code})`);
+                        filtered.push(fullPosDoc);
+                        filteredIds.add(id);
+                    } else if (formData.reporting_to_details && Array.isArray(formData.reporting_to_details)) {
+                        // FALLBACK: If the position is not in the global 'positions' list yet (due to pagination or cache delay),
+                        // but it IS in the 'reporting_to_details' that came with the record, use that.
+                        const detailPos = formData.reporting_to_details.find(p => Number(p.id) === id);
+                        if (detailPos) {
+                            console.log(`✅ [HierarchySync] Using detailed fallback for position: ${detailPos.name}`);
+                            filtered.push(detailPos);
+                            filteredIds.add(id);
+                        }
+                    }
                 }
             });
+        }
+
+        // DEBUG: Final check for visibility
+        if (assignedReportingIds.length > 0) {
+            const visibleIds = filtered.map(p => Number(p.id));
+            const missing = assignedReportingIds.filter(id => !visibleIds.includes(id));
+            if (missing.length > 0) {
+                console.warn("⚠️ [HierarchyVisibility] Assigned reporting IDs exist but none found in results!", {
+                    missingCount: missing.length,
+                    totalPositions: positions.length,
+                    detailsAvailable: !!formData.reporting_to_details
+                });
+            }
         }
 
         return filtered;
@@ -936,9 +1050,14 @@ const ModalForm = () => {
                                 <label className="premium-label"><TrendingUp size={14} /> Level Number / Rank (Manual)</label>
                                 <div className="premium-input-wrapper">
                                     <TrendingUp className="premium-input-icon" size={18} />
-                                    <input type="number" step="0.01" className="premium-input" placeholder="Enter Rank (1.0, 2.1, etc.)" value={formData.rank || ''} onChange={(e) => setFormData({ ...formData, rank: e.target.value || null })} required />
+                                    <input type="number" step="0.01" className="premium-input" placeholder="Enter Rank (1.0, 2.1, etc.)" value={formData.rank || ''} onChange={(e) => setFormData({ ...formData, rank: validateRank(e.target.value, 'rank') || null })} required />
                                 </div>
-                                <span className="form-help-text">Used for vertical ordering. Lower is higher in hierarchy.</span>
+                                {validationErrors.rank && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <X size={12} /> {validationErrors.rank}
+                                    </div>
+                                )}
+                                <span className="form-help-text">Used for vertical ordering. Lower is higher in hierarchy. Max Rank: 15.</span>
                             </div>
                             <div className="form-group">
                                 <label className="premium-label"><Calendar size={14} /> Start Date <span style={{ color: '#ef4444' }}>*</span></label>
@@ -1003,11 +1122,16 @@ const ModalForm = () => {
                                         className="premium-input"
                                         placeholder="Enter Rank (1, 2, 3...)"
                                         value={formData.rank || ''}
-                                        onChange={(e) => setFormData({ ...formData, rank: e.target.value })}
+                                        onChange={(e) => setFormData({ ...formData, rank: validateRank(e.target.value, 'pos_rank') })}
                                         required
                                     />
                                 </div>
-                                <span className="form-help-text">Numerical hierarchy. Lower numbers (like 1) typically indicate the highest seniority.</span>
+                                {validationErrors.pos_rank && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <X size={12} /> {validationErrors.pos_rank}
+                                    </div>
+                                )}
+                                <span className="form-help-text">Numerical hierarchy. Lower numbers (like 1) typically indicate the highest seniority. Max Rank: 15.</span>
                             </div>
                         </div>
                     </div>
@@ -1440,6 +1564,7 @@ const ModalForm = () => {
                                             setFormData({
                                                 ...formData,
                                                 parent: parentId,
+                                                code: '', // Reset to trigger auto-generation with parent context
                                                 country_name: parentOffice.country_name || 'INDIA',
                                                 state_name: parentOffice.state_name || '',
                                                 district_name: parentOffice.district_name || '',
@@ -1447,7 +1572,7 @@ const ModalForm = () => {
                                                 cluster: parentOffice.cluster || '',
                                             });
                                         } else {
-                                            setFormData({ ...formData, parent: null });
+                                            setFormData({ ...formData, parent: null, code: '' });
                                         }
                                     }}>
                                         <option value="">None (Top Level Organization)</option>
@@ -1595,6 +1720,70 @@ const ModalForm = () => {
                                             placeholder="Select Administrative Cluster..."
                                             icon={Layers}
                                             required
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Geospatial Data Section for all offices */}
+                    {(!['L9'].includes(currentLevel?.level_code)) && (
+                        <div className="premium-form-section">
+                            <div className="form-section-title" style={{ marginBottom: '2rem' }}><Navigation size={18} /> Geospatial Coordinates</div>
+                            <div className="form-grid">
+                                <div className="form-group full-width" style={{ gridColumn: '1 / -1' }}>
+                                    <label className="premium-label"><MapPin size={14} /> Office Geo-Location Map</label>
+                                    <div style={{ marginBottom: '1rem', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
+                                        <GeoMapPicker
+                                            latitude={formData.latitude}
+                                            longitude={formData.longitude}
+                                            onLocationSelect={(lat, lng) => setFormData({
+                                                ...formData,
+                                                latitude: parseFloat(lat.toFixed(4)),
+                                                longitude: parseFloat(lng.toFixed(4))
+                                            })}
+                                            searchQuery={[
+                                                formData.location,
+                                                formData.mandal_name,
+                                                formData.district_name,
+                                                formData.state_name,
+                                                formData.country_name
+                                            ].filter(Boolean).join(', ')}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="form-group">
+                                    <label className="premium-label"><Navigation2 size={14} /> Latitude</label>
+                                    <div className="premium-input-wrapper">
+                                        <Navigation2 className="premium-input-icon" size={18} />
+                                        <input
+                                            type="number"
+                                            step="0.000000001"
+                                            className="premium-input"
+                                            placeholder="e.g. 17.3850"
+                                            value={formData.latitude || ''}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                setFormData({ ...formData, latitude: val ? parseFloat(parseFloat(val).toFixed(4)) : '' });
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="form-group">
+                                    <label className="premium-label"><Navigation2 size={14} /> Longitude</label>
+                                    <div className="premium-input-wrapper">
+                                        <Navigation2 className="premium-input-icon" size={18} />
+                                        <input
+                                            type="number"
+                                            step="0.000000001"
+                                            className="premium-input"
+                                            placeholder="e.g. 78.4867"
+                                            value={formData.longitude || ''}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                setFormData({ ...formData, longitude: val ? parseFloat(parseFloat(val).toFixed(4)) : '' });
+                                            }}
                                         />
                                     </div>
                                 </div>
@@ -2808,7 +2997,13 @@ const ModalForm = () => {
                                         className="premium-input"
                                         placeholder="10-digit number"
                                         value={formData.phone || ''}
-                                        onChange={(e) => setFormData({ ...formData, phone: validatePhone(e.target.value, 'employee_phone') })}
+                                        onChange={(e) => {
+                                            const ph = validatePhone(e.target.value, 'employee_phone');
+                                            setFormData({ ...formData, phone: ph });
+                                            if (ph && ph.length === 10 && allEmployees.some(emp => String(emp.phone) === String(ph) && String(emp.id) !== String(formData.id))) {
+                                                showValidationError('employee_phone', 'This phone number is already registered');
+                                            }
+                                        }}
                                         required
                                     />
                                 </div>
@@ -2819,24 +3014,30 @@ const ModalForm = () => {
                                 )}
                             </div>
                             <div className="form-group">
-                                <label className="premium-label"><Mail size={14} /> Personal Email <span style={{ color: '#ef4444' }}>*</span></label>
+                                <label className="premium-label"><Mail size={14} /> Login Email / Primary <span style={{ color: '#ef4444' }}>*</span></label>
                                 <div className="premium-input-wrapper">
                                     <Mail className="premium-input-icon" size={18} />
                                     <input
                                         type="email"
                                         className="premium-input"
-                                        placeholder="Enter Personal Email (e.g. user@gmail.com)"
-                                        value={formData.personal_email || ''}
-                                        onChange={(e) => setFormData({ ...formData, personal_email: validateEmailStrict(e.target.value, 'personal_email') })}
+                                        placeholder="Enter Login Email (e.g. user@gmail.com)"
+                                        value={formData.email || ''}
+                                        onChange={(e) => {
+                                            const emailVal = validateEmailStrict(e.target.value, 'email');
+                                            setFormData({ ...formData, email: emailVal });
+                                            if (emailVal && allEmployees.some(emp => String(emp.email).toLowerCase() === emailVal.toLowerCase() && String(emp.id) !== String(formData.id))) {
+                                                showValidationError('email', 'This email already belongs to another account');
+                                            }
+                                        }}
                                         required
                                     />
                                 </div>
-                                {validationErrors.personal_email && (
+                                {validationErrors.email && (
                                     <div style={{ color: '#ef4444', fontSize: '0.7rem', marginTop: '4px', marginLeft: '3rem' }}>
-                                        ⚠ {validationErrors.personal_email}
+                                        ⚠ {validationErrors.email}
                                     </div>
                                 )}
-                                {formData.personal_email && !isEmailValid(formData.personal_email) && (
+                                {formData.email && !isEmailValid(formData.email) && (
                                     <div style={{ color: '#ef4444', fontSize: '0.7rem', marginTop: '4px', marginLeft: '3rem' }}>
                                         ⚠ Email must end with @.com or .in
                                     </div>
@@ -2850,7 +3051,21 @@ const ModalForm = () => {
                                         <label className="premium-label"><Calendar size={14} /> Joining Date <span style={{ color: '#ef4444' }}>*</span></label>
                                         <div className="premium-input-wrapper">
                                             <Calendar className="premium-input-icon" size={18} />
-                                            <input type="date" className="premium-input" value={formData.hire_date || ''} onChange={(e) => setFormData({ ...formData, hire_date: e.target.value || null })} required max="2099-12-31" />
+                                            <input
+                                                type="date"
+                                                className="premium-input"
+                                                value={formData.hire_date || ''}
+                                                max={formData.employment_end_date || "2099-12-31"}
+                                                onChange={(e) => {
+                                                    const val = e.target.value || null;
+                                                    const newData = { ...formData, hire_date: val };
+                                                    if (formData.employment_end_date && val && val > formData.employment_end_date) {
+                                                        newData.employment_end_date = '';
+                                                    }
+                                                    setFormData(newData);
+                                                }}
+                                                required
+                                            />
                                         </div>
                                     </div>
                                     <div className="form-group">
@@ -2873,7 +3088,14 @@ const ModalForm = () => {
                                             <label className="premium-label"><Calendar size={14} /> Contract End Date <span style={{ color: '#ef4444' }}>*</span></label>
                                             <div className="premium-input-wrapper">
                                                 <Calendar className="premium-input-icon" size={18} />
-                                                <input type="date" className="premium-input" value={formData.employment_end_date || ''} onChange={(e) => setFormData({ ...formData, employment_end_date: e.target.value })} required />
+                                                <input
+                                                    type="date"
+                                                    className="premium-input"
+                                                    value={formData.employment_end_date || ''}
+                                                    min={formData.hire_date || undefined}
+                                                    onChange={(e) => setFormData({ ...formData, employment_end_date: e.target.value })}
+                                                    required
+                                                />
                                             </div>
                                         </div>
                                     )}
@@ -3092,7 +3314,7 @@ const ModalForm = () => {
                                     </div>
                                 </div>
 
-                                <label className="premium-label"><Briefcase size={14} /> Assigned Position(s) <span style={{ color: '#ef4444' }}>*</span></label>
+                                <label className="premium-label"><Briefcase size={14} /> Assigned Position(s)</label>
                                 <div style={{
                                     maxHeight: '300px',
                                     overflowY: 'auto',
@@ -3244,14 +3466,34 @@ const ModalForm = () => {
                                 <label className="premium-label"><Calendar size={14} /> Start Date <span style={{ color: '#ef4444' }}>*</span></label>
                                 <div className="premium-input-wrapper">
                                     <Calendar className="premium-input-icon" size={18} />
-                                    <input type="date" className="premium-input" value={formData.start_date || ''} onChange={(e) => setFormData({ ...formData, start_date: e.target.value })} required />
+                                    <input
+                                        type="date"
+                                        className="premium-input"
+                                        value={formData.start_date || ''}
+                                        max={formData.end_date || undefined}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            const newData = { ...formData, start_date: val };
+                                            if (formData.end_date && val > formData.end_date) {
+                                                newData.end_date = '';
+                                            }
+                                            setFormData(newData);
+                                        }}
+                                        required
+                                    />
                                 </div>
                             </div>
                             <div className="form-group">
                                 <label className="premium-label"><Calendar size={14} /> End Date (Planned)</label>
                                 <div className="premium-input-wrapper">
                                     <Calendar className="premium-input-icon" size={18} />
-                                    <input type="date" className="premium-input" value={formData.end_date || ''} onChange={(e) => setFormData({ ...formData, end_date: e.target.value })} />
+                                    <input
+                                        type="date"
+                                        className="premium-input"
+                                        value={formData.end_date || ''}
+                                        min={formData.start_date || undefined}
+                                        onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                                    />
                                 </div>
                             </div>
                             <div className="form-group full-width">
@@ -3578,6 +3820,12 @@ const ModalForm = () => {
                                         <X size={12} /> {validationErrors.pos_code}
                                     </div>
                                 )}
+                                {formData._pos_project_code && formData.code && (
+                                    <div style={{ marginTop: '8px', padding: '6px 12px', background: 'rgba(136, 19, 55, 0.06)', borderRadius: '8px', border: '1px dashed rgba(136,19,55,0.25)', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 600 }}>
+                                        <Network size={12} />
+                                        Final saved code: <strong style={{ letterSpacing: '0.5px' }}>{formData.code}-{formData._pos_project_code}</strong>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="form-group">
@@ -3639,15 +3887,24 @@ const ModalForm = () => {
                                         value={formData.office || ''}
                                         onChange={(e) => {
                                             const officeId = e.target.value;
-                                            const selectedOff = offices.find(o => o.id == officeId);
+                                            const selectedOff = offices.find(o => String(o.id) === String(officeId));
                                             const masterRoles = selectedOff?.facility_master_details?.role_details || [];
+                                            
+                                            // Get first project code linked to this office
+                                            let projCode = '';
+                                            if (selectedOff?.project_ids?.length > 0) {
+                                                const firstProjId = selectedOff.project_ids[0];
+                                                projCode = projects?.find(p => String(p.id) === String(firstProjId))?.code || '';
+                                            }
+
                                             setFormData({
                                                 ...formData,
                                                 office: officeId,
                                                 _pos_office_filter: officeId, // Sync filter
                                                 department: '',
                                                 section: '',
-                                                role: masterRoles.length === 1 ? masterRoles[0].id : ''
+                                                role: masterRoles.length === 1 ? masterRoles[0].id : '',
+                                                _pos_project_code: projCode
                                             });
                                         }}
                                         disabled={!formData._pos_level_filter && !formData.id}
@@ -3663,7 +3920,14 @@ const ModalForm = () => {
                                     <SearchableSelect
                                         options={departments.filter(d => !formData.office || d.office == formData.office).map(d => ({ id: d.id, name: `${d.name} (${d.project_name || 'General'})` }))}
                                         value={formData.department || ''}
-                                        onChange={(e) => setFormData({ ...formData, department: e.target.value, section: '' })}
+                                        onChange={(e) => {
+                                            const deptId = e.target.value;
+                                            const dept = departments.find(d => String(d.id) === String(deptId));
+                                            const projCode = dept?.project
+                                                ? (projects?.find(p => String(p.id) === String(dept.project))?.code || '')
+                                                : '';
+                                            setFormData({ ...formData, department: deptId, section: '', _pos_project_code: projCode });
+                                        }}
                                         disabled={!formData.office}
                                         placeholder="Select Department..."
                                         icon={Briefcase}
@@ -3676,9 +3940,21 @@ const ModalForm = () => {
                                 <label className="premium-label"><Layers size={14} /> Section / Team</label>
                                 <div className="premium-input-wrapper">
                                     <SearchableSelect
-                                        options={sections.filter(s => s.department == formData.department).map(s => ({ id: s.id, name: s.name }))}
+                                        options={sections.filter(s => {
+                                            const sDeptId = (s.department && typeof s.department === 'object') ? s.department.id : s.department;
+                                            const sDeptIdFinal = s.department_id || sDeptId;
+                                            const formDeptId = (formData.department && typeof formData.department === 'object') ? formData.department.id : formData.department;
+                                            return String(sDeptIdFinal) === String(formDeptId);
+                                        }).map(s => ({ id: s.id, name: s.name }))}
                                         value={formData.section || ''}
-                                        onChange={(e) => setFormData({ ...formData, section: e.target.value })}
+                                        onChange={(e) => {
+                                            const sectId = e.target.value;
+                                            const sect = sections.find(s => String(s.id) === String(sectId));
+                                            const projCode = sect?.project
+                                                ? (projects?.find(p => String(p.id) === String(sect.project))?.code || formData._pos_project_code)
+                                                : formData._pos_project_code;
+                                            setFormData({ ...formData, section: sectId, _pos_project_code: projCode || formData._pos_project_code });
+                                        }}
                                         disabled={!formData.department}
                                         placeholder="None / General"
                                         icon={Layers}

@@ -130,6 +130,8 @@ class Office(models.Model):
     status = models.CharField(max_length=20, default='Active')
     status_date = models.DateField(null=True, blank=True)
     start_date = models.DateField(default=timezone.now, null=True, blank=True)
+    latitude = models.DecimalField(max_digits=12, decimal_places=9, blank=True, null=True)
+    longitude = models.DecimalField(max_digits=12, decimal_places=9, blank=True, null=True)
     class Meta:
         ordering = ['name']
 
@@ -171,11 +173,10 @@ class Facility(Office):
     camp_type = models.CharField(max_length=20, choices=CAMP_TYPE_CHOICES, blank=True, null=True)
     mobile_type = models.CharField(max_length=20, choices=MOBILE_TYPE_CHOICES, blank=True, null=True)
     end_date = models.DateField(blank=True, null=True)
-    latitude = models.DecimalField(max_digits=12, decimal_places=9, blank=True, null=True)
-    longitude = models.DecimalField(max_digits=12, decimal_places=9, blank=True, null=True)
     class Meta:
         verbose_name = "Facility"
         verbose_name_plural = "Facilities"
+        ordering = ['name']
 
     @property
     def is_temporary(self): return self.facility_type in ['MOBILE', 'CAMP']
@@ -468,6 +469,46 @@ class Position(models.Model):
         unique_together = ('department', 'name')
 
     def __str__(self): return self.name
+    
+    def save(self, *args, **kwargs):
+        # 1. Get project code
+        project_code = None
+        if self.department and self.department.project:
+            project_code = self.department.project.code
+        elif self.section and self.section.project:
+            project_code = self.section.project.code
+        elif self.office:
+            project = self.office.projects.first()
+            if project:
+                project_code = project.code
+
+        # 2. Handle code generation
+        if not self.code:
+            import re
+            # Find the highest existing numeric position code base
+            last_pos = Position.objects.filter(code__regex=r'^POS-\d+').order_by('-code').first()
+            
+            if last_pos:
+                match = re.search(r'POS-(\d+)', last_pos.code)
+                if match:
+                    new_number = int(match.group(1)) + 1
+                else:
+                    new_number = 1
+            else:
+                new_number = 1
+                
+            self.code = f"POS-{new_number:05d}"
+            
+        # 3. Always append/ensure project suffix if we have a project
+        if project_code:
+            # If code already has a suffix (handling hyphen or slash if it was there before)
+            if project_code in self.code:
+                # Suffix already present, do nothing or just ensure it's at the end
+                pass
+            else:
+                self.code = f"{self.code}-{project_code}"
+                
+        super().save(*args, **kwargs)
 
 class Employee(models.Model):
     user = models.OneToOneField(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='employee_profile')
@@ -579,6 +620,16 @@ class Project(models.Model):
     class Meta:
         ordering = ['name']
 
+    @property
+    def is_expired(self):
+        from django.utils import timezone
+        if not self.end_date:
+            return False
+        return self.end_date < timezone.now().date()
+
+    @property
+    def is_currently_active(self):
+        return self.status == 'Active' and not self.is_expired
 
     def __str__(self):
         return self.name
