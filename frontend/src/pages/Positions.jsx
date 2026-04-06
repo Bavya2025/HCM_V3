@@ -12,24 +12,26 @@ const Positions = () => {
 
 
 
-    const renderTableData = React.useCallback((item) => (
+    const renderTableData = React.useCallback((item, { searchTerm, HighlightTerm }) => (
         <td style={{ cursor: 'pointer' }} onClick={() => fetchPositionDetail(item.id)}>
-            <div style={{ fontWeight: 700, color: '#1e293b', fontSize: '1rem' }}>{item.name}</div>
+            <div style={{ fontWeight: 700, color: '#1e293b', fontSize: '1rem' }}>
+                <HighlightTerm text={item.name} term={searchTerm} />
+            </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px' }}>
                 <div style={{ fontSize: '0.75rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px', background: '#f8fafc', padding: '2px 8px', borderRadius: '6px' }}>
-                    <Briefcase size={12} /> {item.role_name}
+                    <Briefcase size={12} /> <HighlightTerm text={item.role_name} term={searchTerm} />
                 </div>
                 <div style={{ fontSize: '0.75rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <MapPin size={12} /> {item.office_name}
+                    <MapPin size={12} /> <HighlightTerm text={item.office_name} term={searchTerm} />
                 </div>
                 {item.level_name && (
                     <div style={{ fontSize: '0.75rem', color: '#0369a1', display: 'flex', alignItems: 'center', gap: '4px', background: '#f0f9ff', padding: '2px 8px', borderRadius: '6px', fontWeight: 600 }}>
-                        Level: {item.level_name}
+                        Level: <HighlightTerm text={item.level_name} term={searchTerm} />
                     </div>
                 )}
                 {item.project_name && (
                     <div style={{ fontSize: '0.75rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(136, 19, 55, 0.05)', padding: '2px 8px', borderRadius: '6px', fontWeight: 600 }}>
-                        <FolderKanban size={12} /> {item.project_name}
+                        <FolderKanban size={12} /> <HighlightTerm text={item.project_name} term={searchTerm} />
                     </div>
                 )}
             </div>

@@ -490,8 +490,8 @@ export const DataProvider = ({ children }) => {
 
     const login = async (username, password) => {
         try {
-            // Using test-login to verify routing
-            const res = await api.post('test-login', { username, password });
+            // Using standard auth/login endpoint
+            const res = await api.post('auth/login', { username, password });
             if (res.token) {
                 // Check BEFORE committing the token to prevent the refresh-bypass
                 const sessionKey = `active_session_${res.user.id}`;
