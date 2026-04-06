@@ -2787,7 +2787,7 @@ const ModalForm = () => {
                                 <label className="premium-label"><Edit size={14} /> Task Name <span style={{ color: '#ef4444' }}>*</span></label>
                                 <div className="premium-input-wrapper">
                                     <Edit className="premium-input-icon" size={18} />
-                                    <input type="text" className="premium-input" placeholder="Enter Task Name" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value, 150, 'task_name') })} required />
+                                    <input type="text" className="premium-input" placeholder="Enter Task Name" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateAlphaNumeric(e.target.value, 100, 'task_name') })} required />
                                 </div>
                                 {validationErrors.task_name && (
                                     <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>

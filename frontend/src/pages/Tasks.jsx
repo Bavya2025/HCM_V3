@@ -8,11 +8,13 @@ const Tasks = () => {
 
 
 
-    const renderTableData = React.useCallback((item) => (
+    const renderTableData = React.useCallback((item, { searchTerm, HighlightTerm }) => (
         <td>
-            <div style={{ fontWeight: 700, color: '#1e293b' }}>{item.name}</div>
+            <div style={{ fontWeight: 700, color: '#1e293b' }}>
+                <HighlightTerm text={item.name} term={searchTerm} />
+            </div>
             <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px' }}>
-                <span style={{ fontWeight: 600 }}>Job:</span> {item.job_name} |
+                <span style={{ fontWeight: 600 }}>Job:</span> <HighlightTerm text={item.job_name} term={searchTerm} /> |
                 <span style={{ fontWeight: 600, marginLeft: '8px' }}>URLs:</span> {item.urls && item.urls.length > 0 ? item.urls.map(u => u.url_pattern).join(', ') : 'No URLs mapped'}
             </div>
         </td>
