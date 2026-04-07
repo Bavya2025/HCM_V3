@@ -596,6 +596,7 @@ class SectionSerializer(serializers.ModelSerializer):
     office_level = serializers.ReadOnlyField(source='department.office.level.name')
     office_level_id = serializers.ReadOnlyField(source='department.office.level.id')
     office_is_facility = serializers.ReadOnlyField(source='department.office.is_facility')
+    office = serializers.ReadOnlyField(source='department.office.id')
     project_name = serializers.SerializerMethodField()
 
     def get_project_name(self, obj):
@@ -605,7 +606,12 @@ class SectionSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Section
-        fields = '__all__'
+        fields = [
+            'id', 'name', 'code', 'department', 'department_name', 
+            'office', 'office_name', 'office_level', 'office_level_id', 
+            'office_is_facility', 'project', 'project_name', 
+            'description', 'status', 'start_date', 'created_at'
+        ]
 
 class DepartmentSerializer(serializers.ModelSerializer):
     office_name = serializers.ReadOnlyField(source='office.name')
