@@ -2382,19 +2382,26 @@ class EmployeeViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelView
                         if not code or not name:
                             raise Exception("Employee Code and Name are mandatory.")
 
-                        # Helper for unique fields
-                        def clean_unique(val):
-                            s = str(val or '').strip()
-                            return s if s else None
+                        # Strengthened helper for unique fields
+                        def clean_unique(val, field_name="unknown"):
+                            if val is None: return None
+                            s = str(val).strip()
+                            # If it's a blank string or the literal string "None", return None
+                            if not s or s.lower() == 'none' or s == 'nan':
+                                return None
+                            return s
+
+                        emp_email = clean_unique(row.get('email') or row.get('Email *'), "Email")
+                        emp_phone = clean_unique(row.get('phone') or row.get('Phone *'), "Phone")
 
                         defaults = {
                             'name': name,
-                            'email': clean_unique(row.get('email') or row.get('Email *')),
-                            'phone': clean_unique(row.get('phone') or row.get('Phone *')),
+                            'email': emp_email,
+                            'phone': emp_phone,
                             'gender': str(row.get('gender') or row.get('Gender *') or '').strip(),
                             'father_name': str(row.get('father_name') or row.get('Father Name') or '').strip(),
                             'mother_name': str(row.get('mother_name') or row.get('Mother Name') or '').strip(),
-                            'personal_email': str(row.get('personal_email') or '').strip(),
+                            'personal_email': clean_unique(row.get('personal_email')), # Treat similar to unique for safety
                             'address': str(row.get('address') or row.get('Address') or '').strip(),
                             'employment_type': str(row.get('employment_type') or row.get('Employment Type *') or 'Permanent').strip(),
                             'status': str(row.get('status') or 'Active').strip(),
@@ -2405,6 +2412,9 @@ class EmployeeViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelView
                         dob = row.get('date_of_birth') or row.get('Date of Birth *')
                         if hire_date: defaults['hire_date'] = hire_date
                         if dob: defaults['date_of_birth'] = dob
+
+                        # Diagnostic Print before write
+                        # print(f"DEBUG SYNC: Row {index+2} | Code: {code} | Email: '{emp_email}' | Phone: '{emp_phone}'")
 
                         # 2. Upsert Employee
                         obj, created = Employee.objects.update_or_create(
@@ -2435,6 +2445,10 @@ class EmployeeViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelView
                         else: updated_count += 1
 
                 except Exception as e:
+                    import traceback
+                    # Detailed logging for production debugging
+                    print(f"FAILED SYNC ROW {index+2}: {str(e)}")
+                    # print(traceback.format_exc())
                     errors.append({'row': index + 2, 'reason': str(e), 'data': row})
 
         return Response({
