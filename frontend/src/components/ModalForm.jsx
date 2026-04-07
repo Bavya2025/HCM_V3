@@ -238,10 +238,10 @@ const ModalForm = () => {
     };
 
     const validateCode = (value, maxLength = 30, fieldName = '') => {
-        // Allow only alphabets, numbers, and hyphen
-        const filtered = value.replace(/[^A-Za-z0-9-]/g, '');
+        // Allow alphabets, numbers, hyphen, @, underscore, and slash
+        const filtered = value.replace(/[^A-Za-z0-9\-@_/]/g, '');
         if (filtered !== value && fieldName) {
-            showValidationError(fieldName, 'Only letters, numbers, and hyphens allowed');
+            showValidationError(fieldName, 'Only letters, numbers, -, @, _, and / allowed');
         }
         return filtered.toUpperCase().slice(0, maxLength); // Codes are usually all caps
     };
