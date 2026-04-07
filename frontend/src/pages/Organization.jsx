@@ -86,8 +86,6 @@ const Organization = () => {
                         setSelectedOfficeId(office.id);
                         if (allChildren.length > 0) {
                             toggleNode(e, office.id);
-                        } else {
-                            handleViewOffice ? handleViewOffice(office) : handleEdit('Offices', office);
                         }
                     }}
                 >
@@ -144,7 +142,7 @@ const Organization = () => {
                                                             key={f.id}
                                                             className="facility-detail-item"
                                                             style={{ cursor: 'pointer' }}
-                                                            onClick={() => handleViewOffice ? handleViewOffice(f) : handleEdit('Offices', f)}
+                                                            onClick={() => setSelectedOfficeId(f.id)}
                                                         >
                                                             <span className="name">{f.name}</span>
                                                             <span className="code">{f.code} • {f.status}</span>
@@ -162,7 +160,6 @@ const Organization = () => {
                                             className={`tree-node-box facility-node ${selectedOfficeId === f.id ? 'active-parent' : ''}`}
                                             onClick={() => {
                                                 setSelectedOfficeId(f.id);
-                                                handleViewOffice ? handleViewOffice(f) : handleEdit('Offices', f);
                                             }}
                                         >
                                             <footer>Facility</footer>
@@ -430,8 +427,8 @@ const Organization = () => {
                             selectedOfficeId={selectedOfficeId}
                             onOfficeClick={(off) => {
                                 setSelectedOfficeId(off.id);
-                                // Optional: also fly to it or open details?
                             }}
+                            onViewDetails={(off) => handleViewOffice(off)}
                         />
                     </div>
                 </div>

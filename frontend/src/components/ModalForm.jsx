@@ -4694,7 +4694,7 @@ const ModalForm = () => {
                                 <label className="premium-label"><Edit size={14} /> Location Name <span style={{ color: '#ef4444' }}>*</span></label>
                                 <div className="premium-input-wrapper">
                                     <Edit className="premium-input-icon" size={18} />
-                                    <input type="text" className="premium-input" placeholder="Enter Location Name (e.g. South Gate)" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value.toUpperCase(), 150, 'geo_name') })} required />
+                                    <input type="text" className="premium-input" placeholder="Enter Location Name (e.g. South Gate)" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value.toUpperCase(), 30, 'geo_name') })} required />
                                 </div>
                                 {validationErrors.geo_name && (
                                     <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -4859,7 +4859,7 @@ const ModalForm = () => {
                                 <label className="premium-label"><Edit size={14} /> Cluster Name <span style={{ color: '#ef4444' }}>*</span></label>
                                 <div className="premium-input-wrapper">
                                     <Edit className="premium-input-icon" size={18} />
-                                    <input type="text" className="premium-input" placeholder="Enter Cluster Name" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value.toUpperCase(), 100, 'geo_name') })} required />
+                                    <input type="text" className="premium-input" placeholder="Enter Cluster Name" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value.toUpperCase(), 30, 'geo_name') })} required />
                                 </div>
                                 {validationErrors.geo_name && (
                                     <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>

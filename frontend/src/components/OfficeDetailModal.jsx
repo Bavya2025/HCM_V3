@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     X,
     Building2,
@@ -18,7 +18,9 @@ import {
     Briefcase,
     ShieldAlert,
     Home,
-    FolderKanban
+    FolderKanban,
+    Navigation2,
+    ExternalLink
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 
@@ -31,18 +33,81 @@ const OfficeDetailModal = () => {
         projects
     } = useData();
 
+    const [animate, setAnimate] = useState(false);
+
+    useEffect(() => {
+        if (showOfficeDetail) {
+            const timer = setTimeout(() => setAnimate(true), 50);
+            return () => clearTimeout(timer);
+        } else {
+            setAnimate(false);
+        }
+    }, [showOfficeDetail]);
+
     if (!showOfficeDetail || !selectedOffice) return null;
 
     const data = selectedOffice;
 
-    const ProfileDetailItem = ({ icon: Icon, label, value }) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', background: 'white', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#fff1f2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#be185d' }}>
-                <Icon size={18} />
+    const SectionCard = ({ title, icon: Icon, children, delay }) => (
+        <div style={{
+            background: 'white',
+            padding: '2rem',
+            borderRadius: '28px',
+            border: '1px solid rgba(253, 230, 205, 0.6)',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.02)',
+            transform: animate ? 'translateY(0)' : 'translateY(20px)',
+            opacity: animate ? 1 : 0,
+            transition: `all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) ${delay}s`,
+        }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--magenta)', fontWeight: 800, marginBottom: '2rem', fontSize: '1.1rem', letterSpacing: '0.02em' }}>
+                <div style={{ padding: '8px', background: 'var(--primary-light)', borderRadius: '12px' }}>
+                    <Icon size={20} />
+                </div>
+                {title}
             </div>
-            <div>
-                <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>{label}</div>
-                <div style={{ fontSize: '1rem', color: '#334155', fontWeight: 600 }}>{value || 'Not Specified'}</div>
+            {children}
+        </div>
+    );
+
+    const ProfileDetailItem = ({ icon: Icon, label, value, color = 'var(--magenta)' }) => (
+        <div 
+            style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '1.5rem', 
+                padding: '1.5rem', 
+                background: 'rgba(255, 255, 255, 0.4)', 
+                backdropFilter: 'blur(10px)',
+                borderRadius: '24px', 
+                border: '1px solid rgba(255, 255, 255, 0.6)',
+                transition: 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                position: 'relative',
+                overflow: 'hidden',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.02)'
+            }} 
+            className="hover-lift-premium"
+        >
+            {/* Glossy Accent */}
+            <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '4px', background: color, opacity: 0.7 }}></div>
+            
+            <div style={{ 
+                width: '50px', 
+                height: '50px', 
+                borderRadius: '50%', 
+                background: 'white', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                color: color, 
+                boxShadow: `0 8px 16px ${color}15`,
+                border: '1px solid rgba(0,0,0,0.03)'
+            }}>
+                <Icon size={22} strokeWidth={1.5} />
+            </div>
+            
+            <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}>{label}</div>
+                <div style={{ fontSize: '1.1rem', color: '#1e293b', fontWeight: 800, letterSpacing: '-0.01em' }}>{value || 'Not Specified'}</div>
             </div>
         </div>
     );
@@ -52,7 +117,7 @@ const OfficeDetailModal = () => {
             <div className="modal-content fade-in" style={{
                 height: '100vh',
                 width: '100vw',
-                background: '#fcf8f1',
+                background: 'var(--bg-primary)',
                 overflow: 'hidden',
                 display: 'flex',
                 flexDirection: 'column',
@@ -63,244 +128,233 @@ const OfficeDetailModal = () => {
                 top: 0,
                 left: 0
             }}>
-                {/* Header Bar */}
-                <div className="modal-header" style={{ padding: '1.5rem 2rem', zIndex: 10 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <div style={{
-                            width: '40px',
-                            height: '40px',
-                            borderRadius: '10px',
-                            background: 'linear-gradient(135deg, #be185d 0%, #881337 100%)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: 'white'
-                        }}>
-                            <Building2 size={24} />
+                {/* Premium Glass Header */}
+                <div style={{ 
+                    padding: '1.5rem 3rem', 
+                    background: 'rgba(255, 255, 255, 0.8)', 
+                    backdropFilter: 'blur(20px)',
+                    borderBottom: '1px solid rgba(253, 230, 205, 0.8)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    zIndex: 100
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                        <div style={{ position: 'relative' }}>
+                            <div className="pulse" style={{ position: 'absolute', inset: '-8px', background: 'var(--magenta)', borderRadius: '18px', opacity: 0.15 }}></div>
+                            <div style={{
+                                width: '56px',
+                                height: '56px',
+                                borderRadius: '18px',
+                                background: 'var(--sunset)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: 'white',
+                                position: 'relative',
+                                boxShadow: '0 8px 16px rgba(190, 24, 93, 0.3)'
+                            }}>
+                                <Building2 size={30} />
+                            </div>
                         </div>
                         <div>
-                            <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#1e293b' }}>{data.name}</h1>
-                            <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>OFFICE VIEW • {data.code}</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>{data.name}</h1>
+                                <span style={{ padding: '4px 12px', background: '#ecfdf5', color: '#059669', borderRadius: '12px', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase' }}>{data.status || 'Active'}</span>
+                            </div>
+                            <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <span>{data.code}</span>
+                                <span style={{ opacity: 0.5 }}>•</span>
+                                <span>{data.level_name} UNIT</span>
+                            </div>
                         </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <div style={{ display: 'flex', gap: '1rem' }}>
                         <button
                             onClick={() => setShowOfficeDetail(false)}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                padding: '10px 18px',
-                                borderRadius: '10px',
-                                background: '#fff7ed',
-                                color: '#64748b',
-                                border: '1px solid #fde6cd',
-                                cursor: 'pointer',
-                                fontWeight: 600,
-                                fontSize: '0.9rem'
-                            }}
+                            className="btn-secondary"
+                            style={{ padding: '0.75rem 1.5rem', borderRadius: '14px', fontWeight: 700, fontSize: '0.85rem' }}
                         >
-                            <ArrowLeft size={18} /> Exit View
+                            <X size={18} style={{ marginRight: '8px' }} /> EXIT VIEW
                         </button>
                         <button
                             onClick={() => {
                                 setShowOfficeDetail(false);
                                 handleEdit('Offices', data);
                             }}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                padding: '10px 20px',
-                                borderRadius: '10px',
-                                background: 'linear-gradient(135deg, #be185d 0%, #881337 100%)',
-                                color: 'white',
-                                border: 'none',
-                                cursor: 'pointer',
-                                fontWeight: 600,
-                                fontSize: '0.9rem',
-                                boxShadow: '0 4px 12px rgba(190, 24, 93, 0.25)'
+                            className="btn-primary"
+                            style={{ 
+                                padding: '0.75rem 2rem', 
+                                borderRadius: '14px', 
+                                fontWeight: 800, 
+                                fontSize: '0.85rem',
+                                background: 'var(--sunset)',
+                                boxShadow: '0 10px 20px rgba(190, 24, 93, 0.2)'
                             }}
                         >
-                            <Edit size={18} /> Manage Office
+                            <Edit size={18} style={{ marginRight: '8px' }} /> MANAGE OFFICE
                         </button>
                     </div>
                 </div>
 
-                <div className="modal-form-container" style={{ flex: 1, overflowY: 'auto' }}>
+                <div className="modal-form-container" style={{ flex: 1, overflowY: 'auto', padding: '3rem' }}>
                     <div style={{ maxWidth: '1600px', margin: '0 auto' }}>
 
-                        {/* Top Summary Card */}
-                        <div className="detail-header-grid" style={{
-                            background: 'white',
-                            borderRadius: '24px',
-                            padding: '2.5rem',
-                            marginBottom: '2rem',
-                            border: '1px solid #fde6cd',
-                            boxShadow: '0 10px 25px -5px rgba(0,0,0,0.03)'
-                        }}>
-                            {/* Graphic Identifier */}
-                            <div style={{
-                                width: '140px',
-                                height: '140px',
-                                borderRadius: '32px',
-                                background: '#fff1f2',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: '#be185d',
-                                border: '1px solid #fecdd3'
+                        {/* Top Hero Layout */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '3rem', marginBottom: '3rem' }}>
+                            {/* Visual Identity Profile */}
+                            <div style={{ 
+                                background: 'white', 
+                                borderRadius: '32px', 
+                                padding: '3rem', 
+                                border: '1px solid rgba(253, 230, 205, 0.6)', 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '3rem',
+                                transform: animate ? 'translateX(0)' : 'translateX(-40px)',
+                                opacity: animate ? 1 : 0,
+                                transition: 'all 0.8s cubic-bezier(0.2, 0.8, 0.2, 1)'
                             }}>
-                                <Building2 size={72} strokeWidth={1.5} />
-                            </div>
-
-                            {/* Core Details */}
-                            <div>
-                                <div style={{
-                                    padding: '6px 14px',
-                                    background: '#ecfdf5',
-                                    color: '#059669',
-                                    borderRadius: '24px',
-                                    fontSize: '0.75rem',
-                                    fontWeight: 800,
-                                    width: 'fit-content',
-                                    marginBottom: '1rem',
-                                    textTransform: 'uppercase'
-                                }}>
-                                    {data.level_name || 'Organization Level'}
-                                </div>
-
-                                <h2 style={{ fontSize: '2rem', fontWeight: 800, color: '#1e293b', marginBottom: '0.5rem' }}>{data.name}</h2>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                                    <div style={{ color: '#64748b', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600 }}>
-                                        <Hash size={16} /> {data.code}
+                                <div style={{ position: 'relative', flexShrink: 0 }}>
+                                    <div className="pulse" style={{ position: 'absolute', inset: '-20px', background: 'var(--magenta)', borderRadius: '44px', opacity: 0.1 }}></div>
+                                    <div style={{ width: '160px', height: '160px', borderRadius: '44px', background: '#fdf2f8', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#be185d', border: '1px solid #fce7f3' }}>
+                                        <Building2 size={80} strokeWidth={1} />
                                     </div>
-                                    <div style={{ color: '#cbd5e1' }}>|</div>
-                                    <div style={{ color: '#64748b', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600 }}>
-                                        <Globe size={16} /> {data.country_name || 'India'}
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '1.25rem' }}>
+                                        <span style={{ fontSize: '0.7rem', fontWeight: 800, background: '#fef3c7', color: '#92400e', padding: '6px 14px', borderRadius: '20px', textTransform: 'uppercase' }}>{data.level_name}</span>
+                                        <span style={{ fontSize: '0.7rem', fontWeight: 800, background: '#f3e8ff', color: '#6b21a8', padding: '6px 14px', borderRadius: '20px', textTransform: 'uppercase' }}>{data.facility_type || 'Standard Nature'}</span>
+                                    </div>
+                                    <h2 style={{ fontSize: '2.5rem', fontWeight: 800, color: '#1e1b4b', marginBottom: '1rem', letterSpacing: '-0.04em' }}>{data.name}</h2>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '2rem', color: '#64748b' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600 }}>
+                                            <MapPin size={16} style={{ color: 'var(--magenta)' }} /> {data.state_name || 'All India'}
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600 }}>
+                                            <ShieldCheck size={16} style={{ color: 'var(--orange)' }} /> Verified Entity
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Location Context */}
-                            <div style={{ paddingLeft: '2rem', borderLeft: '1px solid #fcf8f1' }}>
-                                <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700 }}>PARENT OFFICE</div>
-                                <div style={{ fontSize: '1rem', fontWeight: 700, color: '#334155', marginTop: '0.25rem' }}>
-                                    {data.parent_name || 'Primary Root'}
+                            {/* Relationship Info Panel */}
+                            <div style={{ 
+                                display: 'grid', 
+                                gridTemplateColumns: '1fr 1fr', 
+                                gap: '1.5rem',
+                                transform: animate ? 'translateX(0)' : 'translateX(40px)',
+                                opacity: animate ? 1 : 0,
+                                transition: 'all 0.8s cubic-bezier(0.2, 0.8, 0.2, 1)'
+                            }}>
+                                <div style={{ background: '#fefaf5', padding: '2rem', borderRadius: '28px', border: '1px solid #fde6cd' }}>
+                                    <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '1rem' }}>Parent Jurisdiction</div>
+                                    <h4 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1e293b' }}>{data.parent_name || 'Primary Root'}</h4>
+                                    <p style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '4px' }}>Level {data.level} of Hierarchy</p>
                                 </div>
-                                <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.5rem' }}>Hierarchy Level: {data.level}</div>
-                            </div>
-
-                            {/* Connectivity Status */}
-                            <div style={{ paddingLeft: '2rem', borderLeft: '1px solid #fcf8f1' }}>
-                                <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700 }}>STATUS</div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '0.5rem' }}>
-                                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10b981' }}></div>
-                                    <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b' }}>Active</div>
+                                <div style={{ background: '#f0fdfa', padding: '2rem', borderRadius: '28px', border: '1px solid #ccfbf1' }}>
+                                    <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#059669', textTransform: 'uppercase', marginBottom: '1rem' }}>Operational Status</div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <div className="pulse" style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10b981' }}></div>
+                                        <h4 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#065f46' }}>Operational</h4>
+                                    </div>
+                                    <p style={{ fontSize: '0.85rem', color: '#059669', marginTop: '4px' }}>Active since {data.created_at?.split('T')[0]}</p>
                                 </div>
-                                <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.5rem' }}>Operational Unit</div>
                             </div>
                         </div>
 
-                        {/* Main Content Grid */}
-                        <div className="detail-main-grid">
+                        {/* Main Functional Grid */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '2.5rem' }}>
+                            <SectionCard title="INTERNAL CONFIG" icon={Layout} delay={0.1}>
+                                <div style={{ display: 'grid', gap: '1rem' }}>
+                                    <ProfileDetailItem icon={Hash} label="System Identifier" value={data.code} />
+                                    <ProfileDetailItem icon={Calendar} label="Date Registered" value={data.created_at?.split('T')[0]} />
+                                    <ProfileDetailItem icon={ShieldCheck} label="Regulatory ID" value={data.register_id} />
+                                    <ProfileDetailItem icon={UserCircle} label="Authorized DIN" value={data.din_no} />
+                                </div>
+                            </SectionCard>
 
-                            {/* Configuration Panel */}
-                            <div style={{ background: 'white', padding: '2rem', borderRadius: '24px', border: '1px solid #fde6cd' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#be185d', fontWeight: 800, marginBottom: '2rem', fontSize: '1rem' }}>
-                                    <Layout size={20} /> BASIC CONFIGURATION
-                                </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                                    <ProfileDetailItem icon={Hash} label="Internal Code" value={data.code} />
-                                    <ProfileDetailItem icon={Calendar} label="Registered Date" value={data.created_at?.split('T')[0]} />
-                                    <ProfileDetailItem icon={ShieldCheck} label="Compliance ID" value={data.register_id} />
-                                    <ProfileDetailItem icon={UserCircle} label="Director ID" value={data.din_no} />
-                                </div>
-                            </div>
-
-                            {/* Geography Panel */}
-                            <div style={{ background: 'white', padding: '2rem', borderRadius: '24px', border: '1px solid #fde6cd' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#be185d', fontWeight: 800, marginBottom: '2rem', fontSize: '1rem' }}>
-                                    <MapPin size={20} /> GEOGRAPHIC ANCHOR
-                                </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                            <SectionCard title="GEOSPATIAL ANCHOR" icon={MapPin} delay={0.2}>
+                                <div style={{ display: 'grid', gap: '1rem' }}>
                                     <ProfileDetailItem icon={Globe} label="State / Province" value={data.state_name} />
-                                    <ProfileDetailItem icon={Navigation} label="District Unit" value={data.district_name} />
-                                    <ProfileDetailItem icon={Navigation} label="Mandal / Block" value={data.mandal_name} />
-                                    <ProfileDetailItem icon={Home} label="Cluster" value={data.cluster_name ? `${data.cluster_name} (${data.cluster_type || 'N/A'})` : 'Not Specified'} />
+                                    <ProfileDetailItem icon={Navigation} label="District Administrative Unit" value={data.district_name} />
+                                    <ProfileDetailItem icon={Navigation} label="Local Block / Mandal" value={data.mandal_name} />
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                        <ProfileDetailItem icon={Navigation2} label="Latitude" value={data.latitude ? parseFloat(data.latitude).toFixed(6) : 'N/A'} />
+                                        <ProfileDetailItem icon={Navigation2} label="Longitude" value={data.longitude ? parseFloat(data.longitude).toFixed(6) : 'N/A'} />
+                                    </div>
                                 </div>
-                            </div>
+                            </SectionCard>
 
-                            {/* Facility & Type Panel */}
-                            <div style={{ background: 'white', padding: '2rem', borderRadius: '24px', border: '1px solid #fde6cd' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#be185d', fontWeight: 800, marginBottom: '2rem', fontSize: '1rem' }}>
-                                    <Sparkles size={20} /> UNIT SPECIFICATION
-                                </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                            <SectionCard title="UNIT SPECIFICATIONS" icon={Sparkles} delay={0.3}>
+                                <div style={{ display: 'grid', gap: '1rem' }}>
                                     <ProfileDetailItem icon={Layout} label="Facility Nature" value={data.facility_type} />
-                                    <ProfileDetailItem icon={Briefcase} label="Office Category" value={data.level_name} />
-                                    {data.camp_type && <ProfileDetailItem icon={Navigation} label="Operation Mode" value={data.camp_type} />}
-                                    {data.mobile_type && <ProfileDetailItem icon={Sparkles} label="Mobile Category" value={data.mobile_type_display || data.mobile_type} />}
-                                    {data.start_date && <ProfileDetailItem icon={Calendar} label="Validity Start" value={data.start_date} />}
+                                    <ProfileDetailItem icon={Briefcase} label="Deployment Category" value={data.level_name} />
+                                    <ProfileDetailItem icon={Home} label="Cluster Context" value={data.cluster_name ? `${data.cluster_name} - ${data.cluster_type || 'N/A'}` : 'Not Specified'} />
+                                    {data.start_date && <ProfileDetailItem icon={Calendar} label="Operational Start" value={data.start_date} />}
                                 </div>
-                            </div>
+                            </SectionCard>
 
-                            {/* Active Projects Panel */}
-                            <div style={{ gridColumn: '1 / -1', background: 'white', padding: '2.5rem', borderRadius: '24px', border: '1px solid #fde6cd' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#be185d', fontWeight: 800, marginBottom: '2rem', fontSize: '1rem' }}>
-                                    <FolderKanban size={20} /> ACTIVE PROJECT JURISDICTION
-                                </div>
+                            {/* Wide Section: Projects */}
+                            <div style={{ gridColumn: '1 / -1' }}>
+                                <SectionCard title="PROJECT JURISDICTIONS" icon={FolderKanban} delay={0.4}>
+                                    {(() => {
+                                        const officeProjects = projects.filter(p =>
+                                            p.assigned_offices?.includes(data.id) ||
+                                            (p.assigned_level && p.assigned_level == data.level)
+                                        );
 
-                                {(() => {
-                                    // office assigned projects
-                                    const officeProjects = projects.filter(p =>
-                                        p.assigned_offices?.includes(data.id) ||
-                                        (p.assigned_level && p.assigned_level == data.level)
-                                    );
+                                        if (officeProjects.length === 0) {
+                                            return (
+                                                <div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8', fontStyle: 'italic', border: '2px dashed rgba(253, 230, 205, 0.8)', borderRadius: '24px' }}>
+                                                    This unit is currently not linked to any active project contracts.
+                                                </div>
+                                            );
+                                        }
 
-                                    if (officeProjects.length === 0) {
                                         return (
-                                            <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', fontStyle: 'italic', border: '2px dashed #f1f5f9', borderRadius: '16px' }}>
-                                                No specific projects currently assigned to this office.
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '2rem' }}>
+                                                {officeProjects.map(project => (
+                                                    <div key={project.id} style={{
+                                                        padding: '2rem',
+                                                        borderRadius: '24px',
+                                                        background: 'linear-gradient(135deg, #ffffff 0%, #fffbf2 100%)',
+                                                        border: '1px solid rgba(253, 230, 205, 0.6)',
+                                                        boxShadow: '0 8px 30px rgba(0,0,0,0.02)',
+                                                        display: 'flex',
+                                                        flexDirection: 'column',
+                                                        gap: '1.5rem',
+                                                        position: 'relative',
+                                                        overflow: 'hidden'
+                                                    }} className="hover-lift">
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                            <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'linear-gradient(135deg, #f97316 0%, #ef4444 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+                                                                <FolderKanban size={24} />
+                                                            </div>
+                                                            <span style={{ fontSize: '0.7rem', fontWeight: 800, padding: '6px 14px', borderRadius: '20px', background: '#dcfce7', color: '#166534', letterSpacing: '0.05em' }}>
+                                                                ACTIVE
+                                                            </span>
+                                                        </div>
+                                                        <div>
+                                                            <h4 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e1b4b', marginBottom: '0.5rem' }}>{project.name}</h4>
+                                                            <p style={{ fontSize: '0.9rem', color: '#64748b', lineHeight: 1.6 }}>{project.description || 'Enterprise-level project deployment and data management jurisdiction.'}</p>
+                                                        </div>
+                                                        <div style={{ paddingTop: '1.25rem', borderTop: '1px solid #fcf8f1', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                            <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                <Hash size={14} /> {project.code || 'SYS-PROJECT'}
+                                                            </div>
+                                                            <div style={{ color: 'var(--magenta)', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}>
+                                                                DETAILS <ChevronRight size={14} />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
                                             </div>
                                         );
-                                    }
-
-                                    return (
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
-                                            {officeProjects.map(project => (
-                                                <div key={project.id} style={{
-                                                    padding: '1.5rem',
-                                                    borderRadius: '16px',
-                                                    background: '#fff7ed',
-                                                    border: '1px solid #ffedd5',
-                                                    display: 'flex',
-                                                    flexDirection: 'column',
-                                                    gap: '1rem'
-                                                }}>
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                                        <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f97316' }}>
-                                                            <FolderKanban size={20} />
-                                                        </div>
-                                                        <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '4px 10px', borderRadius: '20px', background: '#ecfccb', color: '#4d7c0f' }}>
-                                                            ACTIVE
-                                                        </span>
-                                                    </div>
-                                                    <div>
-                                                        <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1e293b', marginBottom: '4px' }}>{project.name}</div>
-                                                        <div style={{ fontSize: '0.85rem', color: '#64748b' }}>{project.description || 'No description available.'}</div>
-                                                    </div>
-                                                    <div style={{ paddingTop: '1rem', borderTop: '1px solid #fde6cd', marginTop: 'auto', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8' }}>
-                                                        <Hash size={14} /> {project.code || 'N/A'}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    );
-                                })()}
+                                    })()}
+                                </SectionCard>
                             </div>
-
                         </div>
                     </div>
                 </div>

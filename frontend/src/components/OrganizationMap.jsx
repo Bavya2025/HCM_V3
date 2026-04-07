@@ -66,7 +66,7 @@ const MapController = ({ center, zoom, offices, viewMode }) => {
     return null;
 };
 
-const OrganizationMap = ({ offices, selectedOfficeId, onOfficeClick, viewMode }) => {
+const OrganizationMap = ({ offices, selectedOfficeId, onOfficeClick, onViewDetails, viewMode }) => {
     const [mapOffices, setMapOffices] = useState([]);
     const [center, setCenter] = useState([20.5937, 78.9629]); // Default India center
     const [zoom, setZoom] = useState(5);
@@ -137,47 +137,32 @@ const OrganizationMap = ({ offices, selectedOfficeId, onOfficeClick, viewMode })
                         }}
                     >
                         <Popup className="premium-popup">
-                            <div style={{ padding: '8px', minWidth: '200px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', borderBottom: '1px solid #f1f5f9', paddingBottom: '6px' }}>
-                                    <div style={{ padding: '6px', background: 'var(--primary-light)', borderRadius: '8px', color: 'var(--primary)' }}>
-                                        <Building2 size={16} />
+                            <div className="popup-inner-card">
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                                    <div className="popup-header-icon">
+                                        <Building2 size={24} />
                                     </div>
-                                    <div>
-                                        <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0f172a' }}>{office.name}</div>
-                                        <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>{office.level_display || office.level_name}</div>
+                                    <div style={{ flex: 1 }}>
+                                        <h3 className="popup-title">{office.name}</h3>
+                                        <span className="popup-subtitle">{office.level_display || office.level_name}</span>
                                     </div>
                                 </div>
                                 
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#475569' }}>
-                                        <MapPin size={12} style={{ color: '#94a3b8' }} />
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <div className="popup-info-row">
+                                        <MapPin size={14} style={{ color: 'var(--magenta)' }} />
                                         <span>{office.district_name}, {office.state_name}</span>
                                     </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#475569' }}>
-                                        <Navigation size={12} style={{ color: '#94a3b8' }} />
+                                    <div className="popup-info-row">
+                                        <Navigation size={14} style={{ color: 'var(--orange)' }} />
                                         <span>{parseFloat(office.latitude || 0).toFixed(4)}, {parseFloat(office.longitude || 0).toFixed(4)}</span>
                                     </div>
                                     
                                     <button 
-                                        onClick={() => onOfficeClick && onOfficeClick(office)}
-                                        style={{ 
-                                            marginTop: '8px',
-                                            width: '100%',
-                                            padding: '8px',
-                                            background: 'var(--primary)',
-                                            color: 'white',
-                                            border: 'none',
-                                            borderRadius: '8px',
-                                            fontSize: '0.75rem',
-                                            fontWeight: 700,
-                                            cursor: 'pointer',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            gap: '6px'
-                                        }}
+                                        className="popup-btn-premium"
+                                        onClick={() => onViewDetails ? onViewDetails(office) : (onOfficeClick && onOfficeClick(office))}
                                     >
-                                        View Details
+                                        <Navigation size={16} /> VIEW DETAILS
                                     </button>
                                 </div>
                             </div>
