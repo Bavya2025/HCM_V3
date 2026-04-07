@@ -2414,7 +2414,7 @@ class EmployeeViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelView
                         if dob: defaults['date_of_birth'] = dob
 
                         # Diagnostic Print before write
-                        # print(f"DEBUG SYNC: Row {index+2} | Code: {code} | Email: '{emp_email}' | Phone: '{emp_phone}'")
+                        print(f"DEBUG SYNC: Row {index+2} | Code: {code} | Email: '{emp_email}' | Phone: '{emp_phone}'")
 
                         # 2. Upsert Employee
                         obj, created = Employee.objects.update_or_create(
