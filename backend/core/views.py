@@ -2175,7 +2175,13 @@ class EmployeeViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelView
         if job and job != 'all':
             queryset = queryset.filter(positions__job_id=job)
         if position_level and position_level != 'all':
-            queryset = queryset.filter(positions__level_id=position_level)
+            if str(position_level).isdigit():
+                queryset = queryset.filter(positions__level_id=position_level)
+            else:
+                queryset = queryset.filter(
+                    Q(positions__level__name__iexact=position_level) | 
+                    Q(positions__level__level_code__iexact=position_level)
+                )
             
         country_id = self.request.query_params.get('country')
         if country_id and country_id != 'all':
