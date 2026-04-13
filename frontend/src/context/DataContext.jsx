@@ -1792,7 +1792,11 @@ export const DataProvider = ({ children }) => {
 
                         const fieldLabel = key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ');
                         if (messageText.toLowerCase().includes('already exists') || messageText.match(/with this .+ already exists/i)) {
-                            messageText = `This ${fieldLabel.toLowerCase()} already exists`;
+                            if (key === 'code' && modalType === 'Clusters') {
+                                messageText = "This Cluster Code is already in use. Please use a unique 3-5 letter code.";
+                            } else {
+                                messageText = `This ${fieldLabel.toLowerCase()} already exists`;
+                            }
                         } else if (messageText.toLowerCase().includes('must be unique')) {
                             messageText = `This ${fieldLabel.toLowerCase()} already exists`;
                         }

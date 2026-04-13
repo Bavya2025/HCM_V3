@@ -393,7 +393,7 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
                 'District Name': 'Visakhapatnam',
                 'Mandal Name': 'Gajuwaka',
                 'Cluster': 'Cluster Name',
-                'Cluster Code': 'HYD',
+                'Cluster Code': 'VIJAY',
                 'Cluster Type': 'Village'
             };
         } else if (s.includes('positions')) {
