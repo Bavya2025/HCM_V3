@@ -392,6 +392,8 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
                 'State Name': 'Andhra Pradesh',
                 'District Name': 'Visakhapatnam',
                 'Mandal Name': 'Gajuwaka',
+                'Cluster': 'Cluster Name',
+                'Cluster Code': 'HYD',
                 'Cluster Type': 'Village'
             };
         } else if (s.includes('positions')) {
