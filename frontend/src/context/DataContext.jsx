@@ -1032,19 +1032,25 @@ export const DataProvider = ({ children }) => {
                 if (filterEndpoint === 'facilities') filterEndpoint = 'offices';
 
                 let fetchUrl = filterEndpoint;
-                // Ensure we use the 'all_data' endpoint to get full lists for dropdowns
-                if (filterEndpoint === 'positions') fetchUrl = 'positions/all_data';
-                if (filterEndpoint === 'organization-levels') fetchUrl = 'organization-levels/all_data';
-                if (filterEndpoint === 'offices') fetchUrl = 'offices/all_data';
-                if (filterEndpoint === 'employees') fetchUrl = 'employees/all_data';
-                if (filterEndpoint === 'geo-continents') fetchUrl = 'geo-continents/all_data';
-                if (filterEndpoint === 'geo-countries') fetchUrl = 'geo-countries/all_data';
-                if (filterEndpoint === 'geo-states') fetchUrl = 'geo-states/all_data';
-                if (filterEndpoint === 'geo-districts') fetchUrl = 'geo-districts/all_data';
-                if (filterEndpoint === 'geo-mandals') fetchUrl = 'geo-mandals/all_data';
-                if (filterEndpoint === 'geo-clusters') fetchUrl = 'geo-clusters/all_data';
-                if (filterEndpoint === 'visiting-locations') fetchUrl = 'visiting-locations/all_data';
-                if (filterEndpoint === 'landmarks') fetchUrl = 'landmarks/all_data';
+                const allDataMap = {
+                    'organization-levels': 'organization-levels/all_data',
+                    'offices': 'offices/all_data',
+                    'departments': 'departments/all_data',
+                    'sections': 'sections/all_data',
+                    'employees': 'employees/all_data',
+                    'positions': 'positions/all_data',
+                    'geo-continents': 'geo-continents/all_data',
+                    'geo-countries': 'geo-countries/all_data',
+                    'geo-states': 'geo-states/all_data',
+                    'geo-districts': 'geo-districts/all_data',
+                    'geo-mandals': 'geo-mandals/all_data',
+                    'geo-clusters': 'geo-clusters/all_data',
+                    'visiting-locations': 'visiting-locations/all_data',
+                    'landmarks': 'landmarks/all_data'
+                };
+                if (allDataMap[filterEndpoint]) {
+                    fetchUrl = allDataMap[filterEndpoint];
+                }
 
                 const refreshed = preloadedData || await safeFetch(fetchUrl, force);
                 const setterMap = {
@@ -1135,17 +1141,19 @@ export const DataProvider = ({ children }) => {
                     safeFetch('roles', force),
                     safeFetch('jobs', force),
                     safeFetch('positions/all_data', force),
+                    safeFetch('employees/all_data', force),
                     safeFetch('position-levels', force),
                     safeFetch('tasks', force)
                 ]);
 
-                const [departmentsData, sectionsData, rolesData, jobsData, positionsData, positionLevelsData, tasksData] = wave2;
+                const [departmentsData, sectionsData, rolesData, jobsData, positionsData, employeesData, positionLevelsData, tasksData] = wave2;
 
                 setDepartments(universalSort(departmentsData));
                 setSections(universalSort(sectionsData));
                 setRoles(universalSort(rolesData));
                 setJobs(universalSort(jobsData));
                 setPositions(universalSort(positionsData));
+                setAllEmployees(universalSort(employeesData));
                 setPositionLevels(levelSort(positionLevelsData));
                 setTasks(universalSort(tasksData));
 
@@ -1558,7 +1566,7 @@ export const DataProvider = ({ children }) => {
                 String(c.code).toUpperCase() === String(effectiveFormData.code).toUpperCase()
             );
             if (hasDuplicateCode) {
-                showNotification(`The Cluster Code "${effectiveFormData.code.toUpperCase()}" already exists. Please use a unique 3-character code.`, 'error');
+                showNotification(`The Cluster Code "${effectiveFormData.code.toUpperCase()}" already exists. Please use a unique 4-character code.`, 'error');
                 return;
             }
         }

@@ -7,29 +7,26 @@ from django.contrib.auth.models import User
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 
-def generate_short_code(name, model_class):
+def generate_short_code(name, model_class, length=4):
     if not name:
         return ""
-    # Process name: keep only alphanumeric
-    clean_name = re.sub(r'[^a-zA-Z0-9]', '', name).upper()
+    # Process name: keep only letters (no digits for alpha-only codes)
+    clean_name = re.sub(r'[^a-zA-Z]', '', name).upper()
     
-    # Take first 3 letters as base
-    base_code = clean_name[:3]
-    if len(base_code) < 3:
-        base_code = base_code.ljust(3, '1') # Pad if too short
+    # Take first `length` letters as base
+    base_code = clean_name[:length]
+    if len(base_code) < length:
+        base_code = base_code.ljust(length, 'A')  # Pad with 'A' if too short
 
-    # Check for uniqueness
+    # Check for uniqueness using letter suffixes
     code = base_code
-    counter = 1
+    counter = 0
+    alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
     
-    # Try to maintain uniqueness within 3 characters
     while model_class.objects.filter(code=code).exists() and counter < 100:
-        if counter < 10:
-            # Replace last char with digit (e.g. KUR -> KU1)
-            code = base_code[:2] + str(counter)
-        else:
-            # Replace last two chars (e.g. KUR -> K11)
-            code = base_code[:1] + str(counter).zfill(2)
+        # Replace last char with a letter suffix (A, B, C...)
+        suffix = alphabet[counter % 26]
+        code = base_code[:length-1] + suffix
         counter += 1
         
     return code
@@ -275,7 +272,7 @@ class GeoMandal(models.Model):
 
 class GeoCluster(models.Model):
     name = models.CharField(max_length=100)
-    code = models.CharField(max_length=10, blank=True)
+    code = models.CharField(max_length=4, blank=True)
     mandal = models.ForeignKey(GeoMandal, on_delete=models.CASCADE, related_name='clusters')
     cluster_type = models.CharField(max_length=20, choices=[
         ('METROPOLITAN', 'Metropolitan'),

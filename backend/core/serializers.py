@@ -176,8 +176,13 @@ class GeoClusterSerializer(serializers.ModelSerializer):
         if qs.exists():
             raise serializers.ValidationError({"name": f"A cluster with the name '{name}' already exists in this mandal."})
             
-        # Check if code exists globally (if code is provided)
+        # Validate code: must be exactly 4 alphabetic characters (letters only)
         if code:
+            import re
+            if len(code) != 4:
+                raise serializers.ValidationError({"code": "Cluster code must be exactly 4 characters."})
+            if not re.match(r'^[A-Za-z]{4}$', code):
+                raise serializers.ValidationError({"code": "Cluster code must contain only letters (A-Z). No numbers or special characters allowed."})
             qs_code = GeoCluster.objects.filter(code__iexact=code)
             if self.instance:
                 qs_code = qs_code.exclude(id=self.instance.id)

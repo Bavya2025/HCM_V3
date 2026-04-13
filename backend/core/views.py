@@ -1063,6 +1063,7 @@ class GeoContinentViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.Model
     queryset = GeoContinent.objects.all()
     serializer_class = GeoContinentSerializer
     upsert_lookup_fields = ['name']
+    pagination_class = None
 
     @action(detail=False, methods=['get'])
     def all_data(self, request):
@@ -1731,6 +1732,7 @@ class RoleViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelViewSet)
     queryset = Role.objects.all()
     serializer_class = RoleSerializer
     upsert_lookup_fields = ['role_type', 'name']
+    pagination_class = None
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['name']
     ordering_fields = ['name', 'role_type__name']
@@ -1832,6 +1834,7 @@ class PositionLevelViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.Mode
     queryset = PositionLevel.objects.all()
     serializer_class = PositionLevelSerializer
     upsert_lookup_fields = ['name']
+    pagination_class = None
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['name']
@@ -2504,6 +2507,7 @@ class ProjectViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelViewS
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
     upsert_lookup_fields = ['code']
+    pagination_class = None
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['^name', '^code']
     ordering_fields = ['name', 'created_at']
