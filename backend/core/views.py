@@ -3252,6 +3252,8 @@ class GeoBulkUploadView(APIView):
                         cluster_type = (row.get('Cluster Type') or row.get('Category') or 'VILLAGE').upper().strip()
                         
                         if cluster_code:
+                            if len(cluster_code) < 3 or len(cluster_code) > 4:
+                                raise Exception(f"Cluster Code '{cluster_code}' must be between 3 and 4 characters.")
                             dup = GeoCluster.objects.filter(code=cluster_code).exclude(name=cluster_name).first()
                             if dup: raise Exception(f"Cluster Code '{cluster_code}' is already used by '{dup.name}'")
                             
