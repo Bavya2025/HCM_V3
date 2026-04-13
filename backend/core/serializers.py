@@ -223,9 +223,15 @@ class VisitingLocationSerializer(serializers.ModelSerializer):
         return obj.office_ref is not None
 
     def get_office_type(self, obj):
-        if not obj.office_ref or not obj.office_ref.level: return "OFFICE"
+        if not obj.office_ref: return "OFFICE"
+        # If it has a facility master link, it's definitely a facility
+        if obj.office_ref.facility_master_id: return "FACILITY"
+        if not obj.office_ref.level: return "OFFICE"
+        
         level_name = obj.office_ref.level.name.upper()
-        return "FACILITY" if level_name in ("FACILITY", "FACILITATE") else "OFFICE"
+        if "FACILITY" in level_name or "MOBILE" in level_name or "FACILITATE" in level_name:
+            return "FACILITY"
+        return "OFFICE"
 
 
     class Meta:
