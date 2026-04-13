@@ -4869,7 +4869,7 @@ const ModalForm = () => {
                             </div>
 
                             <div className="form-group">
-                                <label className="premium-label"><FileDigit size={14} /> Cluster Code (Short Code) <span style={{ color: '#ef4444' }}>*</span></label>
+                                <label className="premium-label"><FileDigit size={14} /> Cluster Code (Short Code)</label>
                                 <div className="premium-input-wrapper">
                                     <FileDigit className="premium-input-icon" size={18} />
                                     <input
@@ -4881,7 +4881,6 @@ const ModalForm = () => {
                                             const alpha = e.target.value.replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 4);
                                             setFormData({ ...formData, code: alpha });
                                         }}
-                                        required
                                     />
                                 </div>
                                 {validationErrors.geo_code && (
