@@ -4875,7 +4875,7 @@ const ModalForm = () => {
                                     <input
                                         type="text"
                                         className="premium-input"
-                                        placeholder="Enter 4-letter Code (e.g. HYDX)"
+                                        placeholder="Enter 3-4 letter Code (e.g. HYD, VJAY)"
                                         value={formData.code || ''}
                                         onChange={(e) => {
                                             const alpha = e.target.value.replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 4);
@@ -4888,7 +4888,7 @@ const ModalForm = () => {
                                         <X size={12} /> {validationErrors.geo_code}
                                     </div>
                                 )}
-                                <p className="form-help-text">Exactly 4 letters only (e.g. HYDX, VJAY). No numbers or special characters.</p>
+                                <p className="form-help-text">3 to 4 letters only (e.g. HYD, VJAY). No numbers or special characters.</p>
                             </div>
                         </div>
                     </div>

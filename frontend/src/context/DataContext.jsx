@@ -1566,7 +1566,7 @@ export const DataProvider = ({ children }) => {
                 String(c.code).toUpperCase() === String(effectiveFormData.code).toUpperCase()
             );
             if (hasDuplicateCode) {
-                showNotification(`The Cluster Code "${effectiveFormData.code.toUpperCase()}" already exists. Please use a unique 4-character code.`, 'error');
+                showNotification(`The Cluster Code "${effectiveFormData.code.toUpperCase()}" already exists. Please use a unique 3-4 character code.`, 'error');
                 return;
             }
         }
@@ -1660,8 +1660,17 @@ export const DataProvider = ({ children }) => {
             // 2. FETCH UPDATED DATA (Force Refresh Page 1 to ensure order/consistency)
             // Perform refreshes in the background NOT blocking the UI
             setTimeout(() => {
+                // Recover current filter state from sessionStorage to keep UI consistent during background refresh
+                let currentFilters = {};
+                try {
+                    const saved = sessionStorage.getItem(`filters_${currentSectionId}`);
+                    if (saved) currentFilters = JSON.parse(saved);
+                } catch (e) {
+                    console.warn("[DataContext] Could not restore filters for background refresh:", e);
+                }
+
                 const refreshTasks = [
-                    fetchData(true, true, 1, {}, true), // Always refresh page 1 on create/update with FORCE
+                    fetchData(true, true, 1, currentFilters, true), // Refresh with current filters and FORCE
                     fetchStats(true, true),
                     fetchDropdownData(endpoint, null, true) // Force refresh for specific endpoint
                 ];

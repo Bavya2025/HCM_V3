@@ -179,9 +179,9 @@ class GeoClusterSerializer(serializers.ModelSerializer):
         # Validate code: must be exactly 4 alphabetic characters (letters only)
         if code:
             import re
-            if len(code) != 4:
-                raise serializers.ValidationError({"code": "Cluster code must be exactly 4 characters."})
-            if not re.match(r'^[A-Za-z]{4}$', code):
+            if len(code) < 3 or len(code) > 4:
+                raise serializers.ValidationError({"code": "Cluster code must be between 3 and 4 characters."})
+            if not re.match(r'^[A-Za-z]{3,4}$', code):
                 raise serializers.ValidationError({"code": "Cluster code must contain only letters (A-Z). No numbers or special characters allowed."})
             qs_code = GeoCluster.objects.filter(code__iexact=code)
             if self.instance:
