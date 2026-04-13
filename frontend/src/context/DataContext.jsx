@@ -1297,7 +1297,28 @@ export const DataProvider = ({ children }) => {
             setPreviousModal(null);
         }
         setModalType(type);
-        setFormData({ ...customData });
+
+        // Inject geographical defaults (Continent: ASIA, Country: INDIA, State: ANDHRA PRADESH)
+        const geoDefaults = {};
+        
+        // Find IDs for hierarchical filters
+        const asia = (geoContinents || []).find(c => String(c.name).toUpperCase() === 'ASIA');
+        const india = (geoCountries || []).find(c => String(c.name).toUpperCase() === 'INDIA');
+        const ap = (geoStatesData || []).find(s => String(s.name).toUpperCase() === 'ANDHRA PRADESH');
+
+        if (asia) geoDefaults._territory_filter = String(asia.id);
+        if (india) geoDefaults._country_filter = String(india.id);
+        if (ap) geoDefaults._state_filter = String(ap.id);
+
+        // Handle forms that use direct IDs (like States or Districts creation)
+        if (india && (type === 'States')) geoDefaults.country = String(india.id);
+        if (ap && (type === 'Districts')) geoDefaults.state = String(ap.id);
+
+        // Handle forms that use names (Offices, Facilities, Projects, etc.)
+        geoDefaults.country_name = 'INDIA';
+        geoDefaults.state_name = 'ANDHRA PRADESH';
+
+        setFormData({ ...geoDefaults, ...customData });
         setShowModal(true);
 
         // Update URL to reflect "Add"
