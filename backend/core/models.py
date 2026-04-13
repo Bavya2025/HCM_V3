@@ -204,7 +204,6 @@ class GeoContinent(models.Model):
     def save(self, *args, **kwargs):
         if self.name: self.name = self.name.upper()
         if self.code: self.code = self.code.upper()
-        if not self.code: self.code = generate_short_code(self.name, GeoContinent)
         super().save(*args, **kwargs)
     class Meta: verbose_name_plural = "Geo Continents"
 
@@ -219,7 +218,6 @@ class GeoCountry(models.Model):
         if self.name: self.name = self.name.upper()
         if self.code: self.code = self.code.upper()
         if self.continent_ref: self.continent = self.continent_ref.name
-        if not self.code: self.code = generate_short_code(self.name, GeoCountry)
         super().save(*args, **kwargs)
 
 class GeoState(models.Model):
@@ -233,7 +231,6 @@ class GeoState(models.Model):
         if self.name: self.name = self.name.upper()
         if self.code: self.code = self.code.upper()
         if self.country: self.country_name = self.country.name
-        if not self.code: self.code = generate_short_code(self.name, GeoState)
         super().save(*args, **kwargs)
 
 class GeoDistrict(models.Model):
@@ -247,7 +244,6 @@ class GeoDistrict(models.Model):
         if self.name: self.name = self.name.upper()
         if self.code: self.code = self.code.upper()
         if self.state: self.state_name = self.state.name
-        if not self.code: self.code = generate_short_code(self.name, GeoDistrict)
         super().save(*args, **kwargs)
 
 class GeoMandal(models.Model):
@@ -264,7 +260,6 @@ class GeoMandal(models.Model):
         if self.district:
             self.district_name = self.district.name
             if self.district.state: self.state_name = self.district.state.name
-        if not self.code: self.code = generate_short_code(self.name, GeoMandal)
         super().save(*args, **kwargs)
 
     class Meta:
@@ -285,8 +280,6 @@ class GeoCluster(models.Model):
     def save(self, *args, **kwargs):
         if self.name: self.name = self.name.upper()
         if self.code: self.code = self.code.upper()
-        if not self.code:
-            self.code = generate_short_code(self.name, GeoCluster)
         super().save(*args, **kwargs)
 
     # Meta constraints moved to serializer validation for better error messages
