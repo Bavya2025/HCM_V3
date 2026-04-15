@@ -1649,6 +1649,7 @@ class DepartmentViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelVi
         updated_count = 0
         errors = []
         office_cache = {}
+        project_cache = {}
 
         with transaction.atomic():
             for index, row in enumerate(data):
@@ -1670,6 +1671,36 @@ class DepartmentViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelVi
                         'status': str(row.get('Status') or 'Active').strip()
                     }
                     
+                    # Project resolution & Auto-tagging
+                    project_val = str(row.get('Project') or row.get('project') or '').strip()
+                    project = None
+                    if project_val:
+                        if project_val not in project_cache:
+                            p_obj = Project.objects.filter(Q(name__iexact=project_val) | Q(code__iexact=project_val)).first()
+                            project_cache[project_val] = p_obj
+                        project = project_cache.get(project_val)
+                    
+                    if not project:
+                        # Auto-tag from office context
+                        if office.facility_master and office.facility_master.project:
+                            project = office.facility_master.project
+                        else:
+                            # Use is_currently_active property logic in a query
+                            from django.utils import timezone
+                            today = timezone.now().date()
+                            project = office.projects.filter(
+                                status__in=['Active', 'Planning']
+                            ).filter(
+                                Q(end_date__isnull=True) | Q(end_date__gte=today)
+                            ).first()
+                            
+                            # Fallback if no active project found
+                            if not project:
+                                project = office.projects.first()
+                    
+                    if project:
+                        defaults['project'] = project
+
                     code = str(row.get('Department Code') or row.get('code') or '').strip()
                     if code: defaults['code'] = code
 
@@ -1793,6 +1824,7 @@ class SectionViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelViewS
         updated_count = 0
         errors = []
         dept_cache = {}
+        project_cache = {}
 
         with transaction.atomic():
             for index, row in enumerate(data):
@@ -1818,6 +1850,22 @@ class SectionViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelViewS
                         'description': str(row.get('Description') or '').strip(),
                         'status': str(row.get('Status') or 'Active').strip()
                     }
+
+                    # Project resolution & Auto-tagging
+                    project_val = str(row.get('Project') or row.get('project') or '').strip()
+                    project = None
+                    if project_val:
+                        if project_val not in project_cache:
+                            p_obj = Project.objects.filter(Q(name__iexact=project_val) | Q(code__iexact=project_val)).first()
+                            project_cache[project_val] = p_obj
+                        project = project_cache.get(project_val)
+                    
+                    if not project:
+                        # Auto-tag from parent department
+                        project = dept.project
+                    
+                    if project:
+                        defaults['project'] = project
 
                     code = str(row.get('Section Code') or row.get('code') or '').strip()
                     if code: defaults['code'] = code

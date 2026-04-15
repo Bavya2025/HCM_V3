@@ -519,8 +519,23 @@ class OfficeSerializer(serializers.ModelSerializer):
     cluster_type = serializers.ReadOnlyField(source='cluster.get_cluster_type_display')
     assigned_projects = serializers.SerializerMethodField()
     project_ids = serializers.PrimaryKeyRelatedField(source='projects', many=True, read_only=True)
+    project_id = serializers.SerializerMethodField()
     project_code = serializers.SerializerMethodField()
     project_name = serializers.SerializerMethodField()
+
+    def get_project_id(self, obj):
+        # 1. Check Facility Master (Direct Template Mapping)
+        if obj.facility_master and obj.facility_master.project_id:
+            return obj.facility_master.project_id
+        
+        # 2. Check Many-to-Many Projects
+        proj = obj.projects.all()
+        active_proj = next((p for p in proj if p.is_currently_active), None)
+        if active_proj: return active_proj.id
+        
+        # 3. Fallback to any project
+        first_proj = proj.first()
+        return first_proj.id if first_proj else None
 
     def get_assigned_projects(self, obj):
         # Show projects that are Active OR currently in the Planning phase
@@ -571,8 +586,18 @@ class LightOfficeSerializer(serializers.ModelSerializer):
     level_display = serializers.ReadOnlyField(source='level.name')
     parent_id = serializers.PrimaryKeyRelatedField(source='parent', read_only=True)
     project_ids = serializers.PrimaryKeyRelatedField(source='projects', many=True, read_only=True)
+    project_id = serializers.SerializerMethodField()
     project_code = serializers.SerializerMethodField()
     project_name = serializers.SerializerMethodField()
+
+    def get_project_id(self, obj):
+        if obj.facility_master and obj.facility_master.project_id:
+            return obj.facility_master.project_id
+        proj = obj.projects.all()
+        active_proj = next((p for p in proj if p.is_currently_active), None)
+        if active_proj: return active_proj.id
+        first_proj = proj.first()
+        return first_proj.id if first_proj else None
 
     def get_project_code(self, obj):
         proj = obj.projects.first()
@@ -588,7 +613,7 @@ class LightOfficeSerializer(serializers.ModelSerializer):
             'id', 'name', 'code', 'parent', 'parent_id', 'level', 'level_name', 'level_code', 
             'level_display', 'status', 'country_name', 'state_name', 'district_name', 'mandal_name',
             'address', 'latitude', 'longitude', 'phone', 'email', 'location', 'facility_master', 'cluster',
-            'registered_name', 'din_no', 'register_id', 'status_date', 'start_date', 'project_ids',
+            'registered_name', 'din_no', 'register_id', 'status_date', 'start_date', 'project_ids', 'project_id',
             'project_code', 'project_name'
         ]
 

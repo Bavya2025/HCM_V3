@@ -47,7 +47,8 @@ import {
     Heart,
     Gift,
     UserPlus,
-    Activity
+    Activity,
+    Search
 } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
 import { useData } from '../context/DataContext';
@@ -88,6 +89,7 @@ const ModalForm = () => {
 
     // State for validation errors
     const [validationErrors, setValidationErrors] = React.useState({});
+    const [officeSearchTerm, setOfficeSearchTerm] = React.useState('');
 
 
 
@@ -441,6 +443,18 @@ const ModalForm = () => {
                     role: roleId,
                     job: jobId
                 }));
+            }
+        }
+
+        // Hydrate Departments - Auto-tag project from office if missing
+        if (modalType === 'Departments' && formData.office && !formData.project && !formData._dept_hydrated && offices?.length > 0) {
+            const off = offices.find(o => String(o.id) === String(formData.office));
+            if (off) {
+                const master = facilityMasters?.find(m => String(m.id) === String(off.facility_master));
+                const projId = off.project_id || master?.project || off.project_ids?.[0];
+                if (projId) {
+                    setFormData(prev => ({ ...prev, project: projId, _dept_hydrated: true }));
+                }
             }
         }
 
@@ -1571,47 +1585,51 @@ const ModalForm = () => {
                             <div className="form-group">
                                 <label className="premium-label"><Building2 size={14} /> Parent Office (Reporting Line)</label>
                                 <div className="premium-input-wrapper">
-                                    <Building2 className="premium-input-icon" size={18} />
-                                    <select className="premium-input" value={formData.parent || ''} onChange={(e) => {
-                                        const val = e.target.value;
-                                        const parentId = val ? parseInt(val) : null;
-                                        const parentOffice = offices.find(o => o.id === parentId);
+                                    <SearchableSelect
+                                        options={[
+                                            { id: '', name: 'None (Top Level Organization)' },
+                                            ...(offices || [])
+                                                .filter(office => {
+                                                    const officeLevel = orgLevels.find(l => l.id == office.level);
+                                                    if (!officeLevel) return false;
 
-                                        if (parentOffice) {
-                                            setFormData({
-                                                ...formData,
-                                                parent: parentId,
-                                                code: '', // Reset to trigger auto-generation with parent context
-                                                country_name: parentOffice.country_name || 'INDIA',
-                                                state_name: parentOffice.state_name || '',
-                                                district_name: parentOffice.district_name || '',
-                                                mandal_name: parentOffice.mandal_name || '',
-                                                cluster: parentOffice.cluster || '',
-                                            });
-                                        } else {
-                                            setFormData({ ...formData, parent: null, code: '' });
-                                        }
-                                    }}>
-                                        <option value="">None (Top Level Organization)</option>
-                                        {(() => {
-                                            const filteredOffices = offices.filter(office => {
-                                                const officeLevel = orgLevels.find(l => l.id == office.level);
-                                                if (!officeLevel) return false;
+                                                    // 1. Must be a reporting level (not a facility)
+                                                    if (officeLevel.name.toLowerCase().includes('facility')) return false;
 
-                                                // 1. Must be a reporting level (not a facility)
-                                                if (officeLevel.name.toLowerCase().includes('facility')) return false;
+                                                    // 2. Must be an ancestor level (lower rank number means higher in hierarchy)
+                                                    const currentLevel = orgLevels.find(l => l.id == formData.level);
+                                                    if (currentLevel && parseFloat(officeLevel.rank) >= parseFloat(currentLevel.rank)) return false;
 
-                                                // 2. Must be an ancestor level (lower rank number means higher in hierarchy)
-                                                if (currentLevel && parseFloat(officeLevel.rank) >= parseFloat(currentLevel.rank)) return false;
+                                                    // 3. Apply the Parent Level Filter if selected
+                                                    if (formData._parent_level_filter) return office.level == formData._parent_level_filter;
 
-                                                // 3. Apply the Parent Level Filter if selected
-                                                if (formData._parent_level_filter) return office.level == formData._parent_level_filter;
+                                                    return true;
+                                                })
+                                                .map(o => ({ id: String(o.id), name: `${o.name} (${o.level_display || o.level_name})` }))
+                                        ]}
+                                        value={formData.parent || ''}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            const parentId = val ? parseInt(val) : null;
+                                            const parentOffice = offices.find(o => o.id === parentId);
 
-                                                return true;
-                                            });
-                                            return filteredOffices.length > 0 ? filteredOffices.map(office => (<option key={office.id} value={office.id}>{office.name} ({office.level_display})</option>)) : <option disabled>No valid reporting offices found</option>;
-                                        })()}
-                                    </select>
+                                            if (parentOffice) {
+                                                setFormData({
+                                                    ...formData,
+                                                    parent: parentId,
+                                                    code: '', // Reset to trigger auto-generation with parent context
+                                                    country_name: parentOffice.country_name || 'INDIA',
+                                                    state_name: parentOffice.state_name || '',
+                                                    district_name: parentOffice.district_name || '',
+                                                    mandal_name: parentOffice.mandal_name || '',
+                                                });
+                                            } else {
+                                                setFormData({ ...formData, parent: null, code: '' });
+                                            }
+                                        }}
+                                        placeholder="Select Parent..."
+                                        icon={Building2}
+                                    />
                                 </div>
                             </div>
 
@@ -1874,7 +1892,7 @@ const ModalForm = () => {
                                                 setFormData({
                                                     ...formData,
                                                     office: offId,
-                                                    project: master?.project || (off?.project_ids?.[0]) || formData.project || ''
+                                                    project: off?.project_id || master?.project || (off?.project_ids?.[0]) || formData.project || ''
                                                 });
                                             }}
                                             placeholder="Select Establishment..."
@@ -1896,6 +1914,7 @@ const ModalForm = () => {
                                                 const off = offices.find(o => String(o.id) === String(formData.office));
                                                 const master = facilityMasters?.find(m => String(m.id) === String(off?.facility_master));
                                                 if (master?.project && String(p.id) === String(master.project)) return true;
+                                                if (off?.project_id && String(p.id) === String(off.project_id)) return true;
                                                 // Check for Many-to-Many project assignments
                                                 if (off?.project_ids && off.project_ids.some(pid => String(pid) === String(p.id))) return true;
                                                 return false;
@@ -3736,7 +3755,10 @@ const ModalForm = () => {
                                     <SearchableSelect
                                         options={orgLevels?.map(lvl => ({ id: lvl.id, name: `${lvl.name} (${lvl.level_code})` })) || []}
                                         value={formData.assigned_level || ''}
-                                        onChange={(e) => setFormData({ ...formData, assigned_level: e.target.value || null, assigned_offices: [] })}
+                                        onChange={(e) => {
+                                            setFormData({ ...formData, assigned_level: e.target.value || null, assigned_offices: [] });
+                                            setOfficeSearchTerm('');
+                                        }}
                                         placeholder="Corporate / Global Scope"
                                         icon={Layers}
                                     />
@@ -3744,7 +3766,29 @@ const ModalForm = () => {
                             </div>
 
                             <div className="form-group full-width">
-                                <label className="premium-label"><Building2 size={14} /> Assigned Offices (Checklist)</label>
+                                <label className="premium-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span><Building2 size={14} /> Assigned Offices (Checklist)</span>
+                                    {formData.assigned_level && (
+                                        <div style={{ position: 'relative', width: '250px' }}>
+                                            <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                                            <input 
+                                                type="text"
+                                                placeholder="Search offices..."
+                                                value={officeSearchTerm}
+                                                onChange={(e) => setOfficeSearchTerm(e.target.value)}
+                                                style={{
+                                                    width: '100%',
+                                                    padding: '6px 10px 6px 32px',
+                                                    fontSize: '0.75rem',
+                                                    borderRadius: '10px',
+                                                    border: '1px solid #e2e8f0',
+                                                    outline: 'none',
+                                                    background: 'white'
+                                                }}
+                                            />
+                                        </div>
+                                    )}
+                                </label>
                                 <div style={{
                                     maxHeight: '250px',
                                     overflowY: 'auto',
@@ -3757,7 +3801,13 @@ const ModalForm = () => {
                                     gap: '1rem'
                                 }}>
                                     {(() => {
-                                        const filteredOffices = (offices || []).filter(o => !formData.assigned_level || o.level == formData.assigned_level);
+                                        let filteredOffices = (offices || []).filter(o => !formData.assigned_level || o.level == formData.assigned_level);
+                                        
+                                        if (officeSearchTerm && formData.assigned_level) {
+                                            const q = officeSearchTerm.toLowerCase().trim();
+                                            filteredOffices = filteredOffices.filter(o => o.name?.toLowerCase().includes(q) || o.code?.toLowerCase().includes(q));
+                                        }
+
                                         return filteredOffices.length > 0 ? filteredOffices.map(off => (
                                             <label key={off.id} style={{
                                                 display: 'flex',
