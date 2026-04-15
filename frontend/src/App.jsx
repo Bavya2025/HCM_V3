@@ -8,6 +8,7 @@ import BulkUploadModal from './components/BulkUploadModal';
 // Lazy Load Pages for Performance
 const Login = React.lazy(() => import('./pages/Login'));
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
+const ProjectAnalyticsDashboard = React.lazy(() => import('./pages/ProjectAnalyticsDashboard'));
 const OrganizationLevels = React.lazy(() => import('./pages/OrganizationLevels'));
 const Offices = React.lazy(() => import('./pages/Offices'));
 const Departments = React.lazy(() => import('./pages/Departments'));
@@ -81,6 +82,7 @@ const AppContent = () => {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/dashboard" element={<Navigate to="/" replace />} />
+            <Route path="/project-analytics" element={<ProtectedRoute section="dashboard"><ProjectAnalyticsDashboard /></ProtectedRoute>} />
 
             {/* Core Management */}
             <Route path="/users/*" element={<UserManagement />} />

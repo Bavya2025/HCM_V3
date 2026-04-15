@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     Users,
     Building2,
@@ -20,6 +21,7 @@ import { useData } from '../context/DataContext';
 import BavyaSpinner from '../components/BavyaSpinner';
 
 const Dashboard = () => {
+    const navigate = useNavigate();
     const {
         stats,
         handleAdd,
@@ -172,12 +174,21 @@ const Dashboard = () => {
             {/* STATS GRID */}
             <div className="stats-grid stagger-in" style={{ gap: '1.5rem', marginBottom: '2.5rem' }}>
                 {stats.map((stat, idx) => (
-                    <div key={idx} className="stat-card" style={{
-                        background: stat.color,
-                        padding: '1.25rem',
-                        borderRadius: '16px',
-                        minHeight: '140px'
-                    }}>
+                    <div key={idx} 
+                        className="stat-card" 
+                        onClick={() => stat.title === 'Live Projects' ? navigate('/project-analytics') : null}
+                        style={{
+                            background: stat.color,
+                            padding: '1.25rem',
+                            borderRadius: '16px',
+                            minHeight: '140px',
+                            cursor: stat.title === 'Live Projects' ? 'pointer' : 'default',
+                            transform: stat.title === 'Live Projects' ? 'scale(1)' : 'none',
+                            transition: 'transform 0.2s ease',
+                        }}
+                        onMouseEnter={(e) => stat.title === 'Live Projects' && (e.currentTarget.style.transform = 'scale(1.02)')}
+                        onMouseLeave={(e) => stat.title === 'Live Projects' && (e.currentTarget.style.transform = 'scale(1)')}
+                    >
                         <div className="stat-card-glow"></div>
                         <div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
