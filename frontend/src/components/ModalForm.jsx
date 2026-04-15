@@ -1465,10 +1465,10 @@ const ModalForm = () => {
                             </div>
 
                             <div className="form-group">
-                                <label className="premium-label"><Mail size={14} /> Official Email <span style={{ color: '#ef4444' }}>*</span></label>
+                                <label className="premium-label"><Mail size={14} /> Official Email</label>
                                 <div className="premium-input-wrapper">
                                     <Mail className="premium-input-icon" size={18} />
-                                    <input type="email" className="premium-input" placeholder="corporate@organization.com" value={formData.email || ''} onChange={(e) => setFormData({ ...formData, email: validateEmail(e.target.value, 100, 'office_email') })} required />
+                                    <input type="email" className="premium-input" placeholder="corporate@organization.com" value={formData.email || ''} onChange={(e) => setFormData({ ...formData, email: validateEmail(e.target.value, 100, 'office_email') })} />
                                 </div>
                                 {validationErrors.office_email && (
                                     <div style={{ color: '#ef4444', fontSize: '0.7rem', marginTop: '4px', marginLeft: '3rem' }}>
