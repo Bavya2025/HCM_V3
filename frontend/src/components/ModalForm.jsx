@@ -142,7 +142,7 @@ const ModalForm = () => {
             const lvl = orgLevels?.find(l => String(l.id) === String(formData.level));
             if (lvl && (!formData.code || formData.code === '')) {
                 let projectPart = '';
-                
+
                 // For L9, pull from Facility Master project
                 if (lvl.level_code === 'L9' && formData.facility_master) {
                     const master = facilityMasters?.find(m => String(m.id) === String(formData.facility_master));
@@ -150,14 +150,14 @@ const ModalForm = () => {
                         // Use project_code from master if available (e.g. "108-OPS")
                         projectPart = master.project_code || '';
                     }
-                } 
+                }
                 // For others, check parent's project association if possible
                 else if (formData.parent) {
                     const parentOffice = offices?.find(o => String(o.id) === String(formData.parent));
                     if (parentOffice) {
                         // Use the project_code tagged to the parent office
                         projectPart = parentOffice.project_code || '';
-                        
+
                         // Fallback if project_code isn't directly available (legacy records)
                         if (!projectPart) {
                             const codeParts = (parentOffice.code || '').split('-');
@@ -171,7 +171,7 @@ const ModalForm = () => {
                 }
 
                 let levelPart = (lvl.level_code || '').toLowerCase();
-                
+
                 // Convert L-codes to meaningful abbreviations
                 const levelNameLower = (lvl.name || '').toLowerCase();
                 if (levelNameLower.includes('head office')) levelPart = 'ho';
@@ -187,11 +187,11 @@ const ModalForm = () => {
                     // Default to first letters if no specific match
                     levelPart = lvl.name.split(' ').map(n => n[0]).join('').toLowerCase();
                 }
-                
+
                 // If we have a project part, the format is [Project]-[Level]-
                 // If not, just use [Level]-
                 const autoCode = projectPart ? `${projectPart}-${levelPart}-`.toUpperCase() : `${levelPart.toUpperCase()}-`;
-                
+
                 setFormData(prev => ({ ...prev, code: autoCode }));
             }
         }
@@ -294,7 +294,7 @@ const ModalForm = () => {
     const validateRank = (value, fieldName = 'rank') => {
         // Allow only numbers and one decimal point
         let filtered = value.replace(/[^0-9.]/g, '');
-        
+
         // Handle multiple decimal points
         const points = filtered.split('.');
         if (points.length > 2) {
@@ -306,12 +306,12 @@ const ModalForm = () => {
         }
 
         const numVal = parseFloat(filtered);
-        
+
         if (numVal > 15) {
             showValidationError(fieldName, 'Maximum rank allowed is 15');
             return '15';
         }
-        
+
         return filtered;
     };
 
@@ -1218,7 +1218,9 @@ const ModalForm = () => {
                                                         facility_master: masterId,
                                                         name: formData.name || master?.name || '',
                                                         facility_type: master?.mode === 'MOBILE' ? 'MOBILE' : (master?.life === 'TEMPORARY' ? 'CAMP' : 'PERMANENT'),
-                                                        code: master?.project_code || formData.code || ''
+                                                        code: master?.project_code || formData.code || '',
+                                                        start_date: master?.project_start_date || formData.start_date || '',
+                                                        end_date: master?.project_end_date || formData.end_date || ''
                                                     });
                                                 }}
                                                 placeholder="Select Template..."
@@ -1280,19 +1282,29 @@ const ModalForm = () => {
                                         </div>
                                     )}
 
-                                    {(formData.facility_type === 'CAMP' || formData.facility_type === 'MOBILE') && (
-                                        <div className="form-group fade-in">
-                                            <label className="premium-label"><Calendar size={14} /> Estimated Retirement Date</label>
+                                    <div className="form-grid" style={{ gridColumn: '1 / -1', marginBottom: '1.5rem' }}>
+                                        <div className="form-group">
+                                            <label className="premium-label"><Calendar size={14} /> Operational Start Date <span style={{ color: '#ef4444' }}>*</span></label>
                                             <div className="premium-input-wrapper">
                                                 <Calendar className="premium-input-icon" size={18} />
-                                                <input type="date" className="premium-input" value={formData.end_date || ''} onChange={(e) => setFormData({ ...formData, end_date: e.target.value })} required />
+                                                <input type="date" className="premium-input" value={formData.start_date || ''} onChange={(e) => setFormData({ ...formData, start_date: e.target.value })} required />
                                             </div>
                                         </div>
-                                    )}
+
+                                        {(formData.facility_type === 'CAMP' || formData.facility_type === 'MOBILE') && (
+                                            <div className="form-group fade-in">
+                                                <label className="premium-label"><Calendar size={14} /> Estimated Retirement Date</label>
+                                                <div className="premium-input-wrapper">
+                                                    <Calendar className="premium-input-icon" size={18} />
+                                                    <input type="date" className="premium-input" value={formData.end_date || ''} onChange={(e) => setFormData({ ...formData, end_date: e.target.value })} required />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
 
                                     {selectedMaster?.mode === 'MOBILE' && (
                                         <div className="form-group full-width fade-in" style={{ gridColumn: '1 / -1' }}>
-                                            <label className="premium-label"><MapPin size={14} /> Base Location (Context)</label>
+                                            <label className="premium-label"><MapPin size={14} /> Base Location </label>
                                             <div className="premium-input-wrapper">
                                                 <MapPin className="premium-input-icon" size={18} />
                                                 <input
@@ -1440,10 +1452,10 @@ const ModalForm = () => {
                             )}
 
                             <div className="form-group">
-                                <label className="premium-label"><Phone size={14} /> Contact Number <span style={{ color: '#ef4444' }}>*</span></label>
+                                <label className="premium-label"><Phone size={14} /> Contact Number</label>
                                 <div className="premium-input-wrapper">
                                     <Phone className="premium-input-icon" size={18} />
-                                    <input type="tel" className="premium-input" placeholder="10-digit primary contact" value={formData.phone || ''} onChange={(e) => setFormData({ ...formData, phone: validatePhone(e.target.value, 'contact_number') })} required />
+                                    <input type="tel" className="premium-input" placeholder="10-digit primary contact" value={formData.phone || ''} onChange={(e) => setFormData({ ...formData, phone: validatePhone(e.target.value, 'contact_number') })} />
                                 </div>
                                 {validationErrors.contact_number && (
                                     <div style={{ color: '#ef4444', fontSize: '0.7rem', marginTop: '4px', marginLeft: '3rem' }}>
@@ -1465,7 +1477,7 @@ const ModalForm = () => {
                                 )}
                             </div>
 
-                            {currentLevel?.level_code !== 'L2' && (
+                            {currentLevel?.level_code !== 'L2' && currentLevel?.level_code !== 'L9' && (
                                 <div className="form-group">
                                     <label className="premium-label"><Calendar size={14} /> Operational Start Date <span style={{ color: '#ef4444' }}>*</span></label>
                                     <div className="premium-input-wrapper">
@@ -1721,7 +1733,15 @@ const ModalForm = () => {
                                                 return (geoClusters || []).filter(c => c.mandal == mandalId).map(c => ({ id: c.id, name: `${c.name} (${c.cluster_type_display})` }));
                                             })()}
                                             value={formData.cluster || ''}
-                                            onChange={(e) => setFormData({ ...formData, cluster: e.target.value })}
+                                            onChange={(e) => {
+                                                const clusterId = e.target.value;
+                                                const clusterObj = (geoClusters || []).find(c => String(c.id) === String(clusterId));
+                                                setFormData({
+                                                    ...formData,
+                                                    cluster: clusterId,
+                                                    location: currentLevel?.level_code === 'L9' ? (clusterObj?.name || formData.location || '') : formData.location
+                                                });
+                                            }}
                                             placeholder="Select Administrative Cluster..."
                                             icon={Layers}
                                             required
@@ -3894,7 +3914,7 @@ const ModalForm = () => {
                                             const officeId = e.target.value;
                                             const selectedOff = offices.find(o => String(o.id) === String(officeId));
                                             const masterRoles = selectedOff?.facility_master_details?.role_details || [];
-                                            
+
                                             // Get first project code linked to this office
                                             let projCode = '';
                                             if (selectedOff?.project_ids?.length > 0) {

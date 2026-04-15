@@ -68,21 +68,24 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
 
         if (section === 'employees') {
             const employeeMap = {
-                'name': ['name', 'full name', 'employee name', '* name', 'name *', 'Name *'],
-                'email': ['email', 'email address', 'official email', 'login email', '* email', 'email *', 'Email *'],
-                'phone': ['phone', 'mobile', 'contact', 'phone number', '* phone', 'phone *', 'Phone *'],
-                'employee_code': ['code', 'employee code', 'id', 'emp code', '* employee code', 'employee code *', 'Employee Code *'],
-                'gender': ['gender', 'sex', '* gender', 'gender *', 'Gender *'],
-                'date_of_birth': ['date of birth', 'dob', '* date of birth', 'date of birth *', 'Date of Birth *'],
-                'employment_type': ['employment type', 'type', '* employment type', 'employment type *', 'Employment Type *'],
-                'hire_date': ['hire date', 'joining date', 'start date', '* hire date', 'hire date *', '* joining date', 'joining date *', 'Joining Date *'],
-                'status': ['status', 'active', 'is active', '* status', 'status *'],
+                'name': ['name', 'full name', 'employee name', 'name *'],
+                'email': ['email', 'email address', 'official email', 'login email', 'email *'],
+                'phone': ['phone', 'mobile', 'contact', 'phone number', 'phone *'],
+                'employee_code': ['code', 'employee code', 'id', 'emp code', 'employee code *'],
+                'gender': ['gender', 'sex', 'gender *'],
+                'date_of_birth': ['date of birth', 'dob', 'date of birth *'],
+                'employment_type': ['employment type', 'type', 'employment type *'],
+                'hire_date': ['hire date', 'joining date', 'start date', 'hire date *', 'joining date *'],
+                'status': ['status', 'active', 'is active', 'status *'],
                 'Position Codes': ['position codes', 'positions', 'tagged positions', 'position code', 'tagged position code']
             };
 
             const normalized = {};
             Object.keys(employeeMap).forEach(targetKey => {
-                const sourceKey = keys.find(k => employeeMap[targetKey].includes(k.toLowerCase().trim()));
+                const sourceKey = keys.find(k => {
+                    const cleanKey = k.toLowerCase().replace(/\*/g, '').trim();
+                    return employeeMap[targetKey].includes(cleanKey);
+                });
                 if (sourceKey) normalized[targetKey] = clean(row[sourceKey]);
             });
 
@@ -101,7 +104,7 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
 
         if (section === 'positions') {
             const positionMap = {
-                'Position Title': ['position title', 'position name', 'name', 'title', 'position', '* position title'],
+                'Position Title': ['position title', 'position name', 'name', 'title', 'position'],
                 'Position Code': ['position code', 'code', 'pos code'],
                 'Designation Rank / Level': ['designation rank', 'level', 'position level', 'rank', 'designation rank / level'],
                 'Activation Date': ['activation date', 'start date', 'date', 'effective date'],
@@ -119,7 +122,10 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
 
             const normalized = {};
             Object.keys(positionMap).forEach(targetKey => {
-                const sourceKey = keys.find(k => positionMap[targetKey].includes(k.toLowerCase().trim()));
+                const sourceKey = keys.find(k => {
+                    const cleanKey = k.toLowerCase().replace(/\*/g, '').trim();
+                    return positionMap[targetKey].includes(cleanKey);
+                });
                 if (sourceKey) normalized[targetKey] = clean(row[sourceKey]);
             });
             
@@ -129,11 +135,78 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
 
             // Pass through status and other fields if not found in map
             if (!normalized.Status) {
-                const statusKey = keys.find(k => k.toLowerCase().trim() === 'status');
+                const statusKey = keys.find(k => k.toLowerCase().replace(/\*/g, '').trim() === 'status');
                 if (statusKey) normalized.Status = clean(row[statusKey]);
                 else normalized.Status = 'Active';
             }
 
+            return normalized;
+        }
+
+        if (section === 'offices') {
+            const officeMap = {
+                'Office Name': ['office name', 'name', 'unit name', 'branch name', 'office'],
+                'Office Code': ['office code', 'code'],
+                'Registered Name': ['registered name'],
+                'Structural Tier': ['structural tier', 'level', 'tier', 'rank'],
+                'Parent Office': ['parent office', 'parent', 'reporting to office'],
+                'Cluster': ['cluster', 'geo cluster'],
+                'Facility Template': ['facility template', 'facility architecture', 'facility master', 'template'],
+                'Location': ['location', 'base location'],
+                'Address': ['address'],
+                'Phone': ['phone', 'mobile', 'contact', 'contact number'],
+                'Email': ['email'],
+                'Status': ['status'],
+                'Start Date': ['start date', 'operational start date']
+            };
+            const normalized = {};
+            Object.keys(officeMap).forEach(targetKey => {
+                const sourceKey = keys.find(k => {
+                    const cleanKey = k.toLowerCase().replace(/\*/g, '').trim();
+                    return officeMap[targetKey].includes(cleanKey);
+                });
+                if (sourceKey) normalized[targetKey] = clean(row[sourceKey]);
+            });
+            if (normalized['Start Date']) normalized['Start Date'] = fixDate(normalized['Start Date']);
+            return normalized;
+        }
+
+        if (section === 'departments') {
+            const deptMap = {
+                'Department Name': ['department name', 'name', 'dept'],
+                'Department Code': ['department code', 'code'],
+                'Office': ['office', 'unit', 'parent office'],
+                'Description': ['description'],
+                'Status': ['status']
+            };
+            const normalized = {};
+            Object.keys(deptMap).forEach(targetKey => {
+                const sourceKey = keys.find(k => {
+                    const cleanKey = k.toLowerCase().replace(/\*/g, '').trim();
+                    return deptMap[targetKey].includes(cleanKey);
+                });
+                if (sourceKey) normalized[targetKey] = clean(row[sourceKey]);
+            });
+            return normalized;
+        }
+
+        if (section === 'sections') {
+            const secMap = {
+                'Section Name': ['section name', 'name', 'unit', 'section'],
+                'Section Code': ['section code', 'code'],
+                'Department': ['department', 'dept'],
+                'Office': ['office', 'unit'],
+                'Description': ['description'],
+                'Status': ['status']
+            };
+            const normalized = {};
+            Object.keys(secMap).forEach(targetKey => {
+                const sourceKey = keys.find(k => {
+                    const cleanKey = k.toLowerCase().replace(/\*/g, '').trim();
+                    return secMap[targetKey].includes(cleanKey);
+                });
+                if (sourceKey) normalized[targetKey] = clean(row[sourceKey]);
+            });
             return normalized;
         }
 
@@ -277,7 +350,10 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
                     'geo-states': ['Continent', 'Country', 'State', 'State Code'],
                     'geo-districts': ['Continent', 'Country', 'State', 'District', 'District Code'],
                     'geo-mandals': ['Continent', 'Country', 'State', 'District', 'Mandal', 'Mandal Code'],
-                    'geo-clusters': ['Continent', 'Country', 'State', 'District', 'Mandal', 'Cluster', 'Cluster Code']
+                    'geo-clusters': ['Continent', 'Country', 'State', 'District', 'Mandal', 'Cluster', 'Cluster Code'],
+                    'offices': ['Office Name', 'Office Code', 'Structural Tier', 'Parent Office', 'Cluster', 'Start Date'],
+                    'departments': ['Department Name', 'Office'],
+                    'sections': ['Section Name', 'Department']
                 };
 
 
@@ -332,6 +408,9 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
                         let targetEndpoint = '';
                         if (section === 'employees') targetEndpoint = 'employees/bulk-upload/';
                         else if (section === 'positions') targetEndpoint = 'positions/bulk-upload/';
+                        else if (section === 'offices') targetEndpoint = 'offices/bulk-upload/';
+                        else if (section === 'departments') targetEndpoint = 'departments/bulk-upload/';
+                        else if (section === 'sections') targetEndpoint = 'sections/bulk-upload/';
                         else targetEndpoint = `geo/bulk-upload/?section=${section}`;
                         
                         const response = await api.post(targetEndpoint, chunk, { signal });
@@ -430,6 +509,34 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
                 'Mother Name': 'Smt Doe'
             };
 
+        } else if (s.includes('offices')) {
+            headers = {
+                'Office Name *': 'Vizag Regional Office',
+                'Office Code *': 'VZ-RO-01',
+                'Structural Tier *': 'L2 - Regional Office',
+                'Parent Office *': 'Head Office',
+                'Cluster *': 'Cluster Name',
+                'Facility Template': 'PHC Architecture Template',
+                'Start Date *': '2023-01-01',
+                'Status': 'Active'
+            };
+        } else if (s.includes('departments')) {
+            headers = {
+                'Department Name *': 'Operations',
+                'Department Code': 'OPS-DEPT',
+                'Office *': 'Vizag Regional Office',
+                'Description': 'Main ops dept',
+                'Status': 'Active'
+            };
+        } else if (s.includes('sections')) {
+            headers = {
+                'Section Name *': 'Billing Team',
+                'Section Code': 'BILL-SEC',
+                'Department *': 'Operations',
+                'Office *': 'Vizag Regional Office',
+                'Description': 'Billing unit',
+                'Status': 'Active'
+            };
         } else if (s.includes('mandals')) {
 
             headers = {

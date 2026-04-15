@@ -481,6 +481,8 @@ class JobFamilySerializer(serializers.ModelSerializer):
 class FacilityMasterSerializer(serializers.ModelSerializer):
     project_name = serializers.SerializerMethodField()
     project_code = serializers.SerializerMethodField()
+    project_start_date = serializers.SerializerMethodField()
+    project_end_date = serializers.SerializerMethodField()
 
     def get_project_name(self, obj):
         if obj.project and obj.project.is_currently_active:
@@ -491,6 +493,12 @@ class FacilityMasterSerializer(serializers.ModelSerializer):
         if obj.project and obj.project.is_currently_active:
             return obj.project.code
         return None
+
+    def get_project_start_date(self, obj):
+        return obj.project.start_date if obj.project else None
+
+    def get_project_end_date(self, obj):
+        return obj.project.end_date if obj.project else None
     life_display = serializers.CharField(source='get_life_display', read_only=True)
     mode_display = serializers.CharField(source='get_mode_display', read_only=True)
     project_type_display = serializers.CharField(source='get_project_type_display', read_only=True)

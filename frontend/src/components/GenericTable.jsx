@@ -822,7 +822,7 @@ const GenericTable = ({ renderTableData, customData = null }) => {
                             <Plus size={18} /> Add New
                         </button>
                     )}
-                    {['employees', 'positions', 'geo-continents', 'geo-countries', 'geo-states', 'geo-districts', 'geo-mandals', 'geo-clusters'].includes(activeSection) && canCreate(activeSection) && (
+                    {['employees', 'positions', 'offices', 'departments', 'sections', 'geo-continents', 'geo-countries', 'geo-states', 'geo-districts', 'geo-mandals', 'geo-clusters'].includes(activeSection) && canCreate(activeSection) && (
 
                         <button
                             type="button"

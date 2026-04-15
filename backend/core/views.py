@@ -1495,6 +1495,131 @@ class OfficeViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelViewSe
         serializer = LightOfficeSerializer(queryset, many=True)
         return Response(serializer.data)
 
+    @action(detail=False, methods=['post'], url_path='bulk-upload')
+    def bulk_upload(self, request):
+        data = request.data
+        if not isinstance(data, list):
+            return Response({'error': 'Expected a list of data rows.'}, status=400)
+
+        created_count = 0
+        updated_count = 0
+        errors = []
+        created_offices = []
+
+        # Relationship Caches
+        level_cache = {}
+        cluster_cache = {}
+        office_cache = {}
+
+        with transaction.atomic():
+            # Pass 1: Create/Update Offices (Basic Fields)
+            for index, row in enumerate(data):
+                try:
+                    with transaction.atomic():
+                        name = str(row.get('Office Name') or row.get('name') or '').strip()
+                        code = str(row.get('Office Code') or row.get('code') or '').strip()
+                        if not name: raise Exception("Office Name is required.")
+
+                        # Level resolution
+                        level_val = str(row.get('Structural Tier') or row.get('tier') or row.get('level') or '').strip()
+                        if not level_val: raise Exception("Structural Tier (Level) is required.")
+                        if level_val not in level_cache:
+                            lvl = OrganizationLevel.objects.filter(Q(name__iexact=level_val) | Q(level_code__iexact=level_val)).first()
+                            if not lvl: raise Exception(f"Level '{level_val}' not found.")
+                            level_cache[level_val] = lvl
+                        level = level_cache[level_val]
+
+                        # Cluster resolution
+                        cluster_val = str(row.get('Cluster') or row.get('cluster') or '').strip()
+                        cluster = None
+                        if cluster_val:
+                            if cluster_val not in cluster_cache:
+                                c_obj = GeoCluster.objects.filter(name__iexact=cluster_val).first()
+                                if not c_obj:
+                                    # Fallback to code
+                                    c_obj = GeoCluster.objects.filter(code__iexact=cluster_val).first()
+                                if not c_obj:
+                                    raise Exception(f"Cluster '{cluster_val}' not found. Please ensure the geographic hierarchy is uploaded first.")
+                                cluster_cache[cluster_val] = c_obj
+                            cluster = cluster_cache[cluster_val]
+
+                        # Facility Master (Template) Resolution
+                        facility_master = None
+                        fm_val = str(row.get('Facility Template') or row.get('facility_master') or '').strip()
+                        if fm_val:
+                            facility_master = FacilityMaster.objects.filter(name__iexact=fm_val).first()
+                            if not facility_master:
+                                raise Exception(f"Facility Template '{fm_val}' not found.")
+
+                        defaults = {
+                            'level': level,
+                            'cluster': cluster,
+                            'facility_master': facility_master,
+                            'registered_name': str(row.get('Registered Name') or row.get('registered_name') or name).strip(),
+                            'location': str(row.get('Location') or row.get('location') or '').strip(),
+                            'address': str(row.get('Address') or row.get('address') or '').strip(),
+                            'phone': str(row.get('Phone') or row.get('Contact Number') or '').strip() or None,
+                            'email': str(row.get('Email') or row.get('email') or '').strip() or None,
+                            'status': str(row.get('Status') or 'Active').strip(),
+                            'start_date': str(row.get('Start Date') or row.get('Operational Start Date') or timezone.now().date()).strip()
+                        }
+                        
+                        # Store the provided code for pass 2 processing
+                        if code: defaults['code'] = code
+
+                        # Always use Name for organizational units to avoid collision between suffixes (like '01')
+                        # The code will be finalized/prefixed in Pass 2 if it's a suffix.
+                        obj, created = Office.objects.update_or_create(name=name, defaults=defaults)
+
+                        if created: created_count += 1
+                        else: updated_count += 1
+                        created_offices.append((obj, row, index))
+                        office_cache[name] = obj
+                        if code: office_cache[code] = obj
+
+                except Exception as e:
+                    errors.append({'row': index + 2, 'reason': str(e), 'data': row})
+
+            # Pass 2: Hierarchy Linking & Code Auto-Generation
+            for obj, row, index in created_offices:
+                try:
+                    parent_val = str(row.get('Parent Office') or row.get('parent') or '').strip()
+                    if parent_val:
+                        parent = Office.objects.filter(Q(code__iexact=parent_val) | Q(name__iexact=parent_val)).first()
+                        if parent:
+                            if parent.id == obj.id:
+                                raise Exception("An office cannot be its own parent.")
+                            obj.parent = parent
+                            
+                            # --- Auto-Prefix Code Logic (Match UI behavior) ---
+                            current_code = str(obj.code or '').strip()
+                            # If code is just a suffix (no hyphens) and we have a parent/level
+                            if current_code and '-' not in current_code:
+                                project = parent.projects.first()
+                                project_prefix = (project.code if project else '').upper()
+                                level_prefix = (obj.level.level_code if obj.level else '').upper()
+                                
+                                prefix = ""
+                                if project_prefix: prefix += f"{project_prefix}-"
+                                if level_prefix: prefix += f"{level_prefix}-"
+                                
+                                if prefix:
+                                    obj.code = f"{prefix}{current_code}".upper()
+                            
+                            obj.save()
+                        else:
+                            raise Exception(f"Parent office '{parent_val}' not found.")
+                except Exception as e:
+                    errors.append({'row': index + 2, 'reason': f"Hierarchy error: {str(e)}", 'data': row})
+
+        return Response({
+            'success': len(errors) == 0,
+            'created': created_count,
+            'updated': updated_count,
+            'errors': errors,
+            'total_processed': len(data)
+        })
+
 class FacilityViewSet(ScopedViewSetMixin, viewsets.ModelViewSet):
     queryset = Facility.objects.all()
     serializer_class = FacilitySerializer
@@ -1513,6 +1638,58 @@ class DepartmentViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelVi
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['name', 'code', 'office__country_name', 'office__state_name', 'office__district_name', 'office__mandal_name']
     ordering = ['name']
+
+    @action(detail=False, methods=['post'], url_path='bulk-upload')
+    def bulk_upload(self, request):
+        data = request.data
+        if not isinstance(data, list):
+            return Response({'error': 'Expected a list of data rows.'}, status=400)
+
+        created_count = 0
+        updated_count = 0
+        errors = []
+        office_cache = {}
+
+        with transaction.atomic():
+            for index, row in enumerate(data):
+                try:
+                    name = str(row.get('Department Name') or row.get('name') or '').strip()
+                    office_val = str(row.get('Office') or row.get('office') or '').strip()
+                    
+                    if not name: raise Exception("Department Name is required.")
+                    if not office_val: raise Exception("Office name or code is required.")
+
+                    if office_val not in office_cache:
+                        off = Office.objects.filter(Q(code__iexact=office_val) | Q(name__iexact=office_val)).first()
+                        if not off: raise Exception(f"Office '{office_val}' not found.")
+                        office_cache[office_val] = off
+                    office = office_cache[office_val]
+
+                    defaults = {
+                        'description': str(row.get('Description') or '').strip(),
+                        'status': str(row.get('Status') or 'Active').strip()
+                    }
+                    
+                    code = str(row.get('Department Code') or row.get('code') or '').strip()
+                    if code: defaults['code'] = code
+
+                    obj, created = Department.objects.update_or_create(
+                        name=name, office=office, defaults=defaults
+                    )
+
+                    if created: created_count += 1
+                    else: updated_count += 1
+
+                except Exception as e:
+                    errors.append({'row': index + 2, 'reason': str(e), 'data': row})
+
+        return Response({
+            'success': len(errors) == 0,
+            'created': created_count,
+            'updated': updated_count,
+            'errors': errors,
+            'total_processed': len(data)
+        })
 
     @action(detail=False, methods=['get'])
     def all_data(self, request):
@@ -1605,6 +1782,63 @@ class SectionViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelViewS
     ordering_fields = ['name', 'department__name', 'office__name']
     ordering = ['name']
     pagination_class = None
+
+    @action(detail=False, methods=['post'], url_path='bulk-upload')
+    def bulk_upload(self, request):
+        data = request.data
+        if not isinstance(data, list):
+            return Response({'error': 'Expected a list of data rows.'}, status=400)
+
+        created_count = 0
+        updated_count = 0
+        errors = []
+        dept_cache = {}
+
+        with transaction.atomic():
+            for index, row in enumerate(data):
+                try:
+                    name = str(row.get('Section Name') or row.get('name') or '').strip()
+                    dept_val = str(row.get('Department') or row.get('department') or '').strip()
+                    office_val = str(row.get('Office') or row.get('office') or '').strip()
+
+                    if not name: raise Exception("Section Name is required.")
+                    if not dept_val: raise Exception("Department name is required.")
+
+                    dept_key = f"{office_val}|{dept_val}"
+                    if dept_key not in dept_cache:
+                        qs = Department.objects.filter(name__iexact=dept_val)
+                        if office_val:
+                            qs = qs.filter(Q(office__name__iexact=office_val) | Q(office__code__iexact=office_val))
+                        dept = qs.first()
+                        if not dept: raise Exception(f"Department '{dept_val}' not found (context: {office_val}).")
+                        dept_cache[dept_key] = dept
+                    dept = dept_cache[dept_key]
+
+                    defaults = {
+                        'description': str(row.get('Description') or '').strip(),
+                        'status': str(row.get('Status') or 'Active').strip()
+                    }
+
+                    code = str(row.get('Section Code') or row.get('code') or '').strip()
+                    if code: defaults['code'] = code
+
+                    obj, created = Section.objects.update_or_create(
+                        name=name, department=dept, defaults=defaults
+                    )
+
+                    if created: created_count += 1
+                    else: updated_count += 1
+
+                except Exception as e:
+                    errors.append({'row': index + 2, 'reason': str(e), 'data': row})
+
+        return Response({
+            'success': len(errors) == 0,
+            'created': created_count,
+            'updated': updated_count,
+            'errors': errors,
+            'total_processed': len(data)
+        })
 
     @action(detail=False, methods=['get'])
     def all_data(self, request):
