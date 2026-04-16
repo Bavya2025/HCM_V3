@@ -466,7 +466,8 @@ const GenericTable = ({ renderTableData, customData = null }) => {
             const lowerSearch = searchTerm.trim().toLowerCase();
             result = result.filter(item => {
                 // Combine visible fields that the user might want to search
-                const searchableFields = [
+                // Local search across common fields
+                let searchableFields = [
                     item.name, 
                     item.employee_code, 
                     item.code, 
@@ -477,13 +478,16 @@ const GenericTable = ({ renderTableData, customData = null }) => {
                     item.title
                 ];
 
+                // For Employees: Add position/role names to search
+                if (activeSection === 'employees' && item.positions_details) {
+                    item.positions_details.forEach(p => {
+                        searchableFields.push(p.name, p.role_name, p.office_name);
+                    });
+                }
+
                 return searchableFields.some(field => {
                     if (!field) return false;
                     const fieldVal = field.toString().toLowerCase().trim();
-                    
-                    // PREFERENCE: 'Starts With' is prioritized, but 'Contains' is the fallback
-                    // This satisfies the user's need to find "Production" for "Pr" 
-                    // while also finding "AP104..."
                     return fieldVal.includes(lowerSearch);
                 });
             });
@@ -575,13 +579,13 @@ const GenericTable = ({ renderTableData, customData = null }) => {
 
         // Type / Classification filter (Unified)
         if (clusterTypeFilter !== 'all') {
-            // For geo-clusters, we don't filter the Mandals strictly by type; 
-            // instead we pass the filter to the render function to show relevant child entities.
-            if (activeSection !== 'geo-clusters') {
-                result = result.filter(item =>
-                    item && (item.cluster_type === clusterTypeFilter || item.type === clusterTypeFilter)
-                );
-            }
+            result = result.filter(item =>
+                item && (
+                    item.cluster_type === clusterTypeFilter || 
+                    item.type === clusterTypeFilter || 
+                    item.cluster_type_display === clusterTypeFilter
+                )
+            );
         }
 
         // Continent filter
@@ -717,10 +721,15 @@ const GenericTable = ({ renderTableData, customData = null }) => {
 
         // Position Level Filter
         if (positionLevelFilter !== 'all') {
-            result = result.filter(item =>
-                matchesId(item.level, positionLevelFilter) ||
-                matchesId(item.level_id, positionLevelFilter)
-            );
+            result = result.filter(item => {
+                if (matchesId(item.level, positionLevelFilter) || matchesId(item.level_id, positionLevelFilter)) return true;
+
+                // For Employees: Look up via positions_details
+                if (activeSection === 'employees' && item.positions_details) {
+                    return item.positions_details.some(p => matchesId(p.level_id, positionLevelFilter));
+                }
+                return false;
+            });
         }
 
         return result;

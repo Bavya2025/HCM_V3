@@ -2386,7 +2386,7 @@ class EmployeeViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelView
     serializer_class = EmployeeSerializer
     upsert_lookup_fields = ['employee_code'] # Use employee_code as the primary unique identifier for upserts
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ['name', 'employee_code', 'positions__office__country_name', 'positions__office__state_name', 'positions__office__district_name', 'positions__office__mandal_name']
+    search_fields = ['name', 'employee_code', 'positions__name', 'positions__role__name', 'positions__office__name', 'positions__office__country_name', 'positions__office__state_name', 'positions__office__district_name', 'positions__office__mandal_name']
     ordering_fields = ['name', 'created_at', 'employee_code']
     ordering = ['-id']
 

@@ -12,43 +12,45 @@ const GeoLocations = () => {
         'geo-mandals', 'geo-clusters', 'visiting-locations', 'landmarks'
     ];
 
-    const renderTableData = React.useCallback((item, filters = {}) => {
+    const renderTableData = React.useCallback((item, { searchTerm = '', HighlightTerm }) => {
+        const h = (text) => <HighlightTerm text={text} term={searchTerm} />;
+
         switch (activeSection) {
             case 'geo-continents':
                 return (
                     <td>
-                        <div style={{ fontWeight: 600 }}>{item.name}</div>
+                        <div style={{ fontWeight: 600 }}>{h(item.name)}</div>
                     </td>
                 );
             case 'geo-countries':
                 return (
                     <td>
-                        <div style={{ fontWeight: 600 }}>{item.name}</div>
+                        <div style={{ fontWeight: 600 }}>{h(item.name)}</div>
                         <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                            {item.continent_name || item.continent || 'No Continent'}
+                            {h(item.continent_name || item.continent || 'No Continent')}
                         </div>
                     </td>
                 );
             case 'geo-states':
                 return (
                     <td>
-                        <div style={{ fontWeight: 600 }}>{item.name}</div>
-                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{item.country_name || 'No Country'}</div>
+                        <div style={{ fontWeight: 600 }}>{h(item.name)}</div>
+                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{h(item.country_name || 'No Country')}</div>
                     </td>
                 );
             case 'geo-districts':
                 return (
                     <td>
-                        <div style={{ fontWeight: 600 }}>{item.name}</div>
-                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>State: {item.state_name || 'No State'}</div>
+                        <div style={{ fontWeight: 600 }}>{h(item.name)}</div>
+                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>State: {h(item.state_name || 'No State')}</div>
                     </td>
                 );
             case 'geo-mandals':
                 return (
                     <td>
-                        <div style={{ fontWeight: 600 }}>{item.name}</div>
+                        <div style={{ fontWeight: 600 }}>{h(item.name)}</div>
                         <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                            {item.district_name ? `${item.district_name}, ` : ''}{item.state_name || ''}
+                            {item.district_name ? <>{h(item.district_name)}, </> : ''}{h(item.state_name || '')}
                         </div>
                     </td>
                 );
@@ -57,7 +59,7 @@ const GeoLocations = () => {
                     <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                             <div style={{ fontWeight: 800, fontSize: '1rem', color: '#1e293b' }}>
-                                {item.name} {item.code && <span style={{ color: 'var(--magenta)', fontSize: '0.85rem' }}>({item.code})</span>}
+                                {h(item.name)} {item.code && <span style={{ color: 'var(--magenta)', fontSize: '0.85rem' }}>({h(item.code)})</span>}
                             </div>
                             <span style={{
                                 padding: '2px 10px',
@@ -69,11 +71,11 @@ const GeoLocations = () => {
                                 color: '#0369a1',
                                 border: '1px solid #bae6fd'
                             }}>
-                                {item.cluster_type_display || item.cluster_type}
+                                {h(item.cluster_type_display || item.cluster_type)}
                             </span>
                         </div>
                         <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '8px' }}>
-                            Mandal: <strong>{item.mandal_name}</strong> | District: <strong>{item.district_name}</strong>
+                            Mandal: <strong>{h(item.mandal_name)}</strong> | District: <strong>{h(item.district_name)}</strong>
                         </div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                             {item.visiting_locations?.length > 0 && (
@@ -96,7 +98,7 @@ const GeoLocations = () => {
                 return (
                     <td>
                         <div style={{ fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center' }}>
-                            {item.name}
+                            {h(item.name)}
                             {item.is_office && (
                                 <span style={{
                                     padding: '2px 8px',
@@ -112,7 +114,7 @@ const GeoLocations = () => {
                                     alignItems: 'center',
                                     gap: '2px'
                                 }}>
-                                    <Building2 size={10} /> {item.office_type || 'OFFICE'}
+                                    <Building2 size={10} /> {h(item.office_type || 'OFFICE')}
                                 </span>
                             )}
                         </div>
@@ -120,17 +122,17 @@ const GeoLocations = () => {
                             Lat: <strong>{item.latitude}</strong> | Long: <strong>{item.longitude}</strong>
                         </div>
                         <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
-                            Cluster: <strong>{item.cluster_name}</strong> ({item.cluster_type_display}) | Mandal: <strong>{item.mandal_name}</strong>
+                            Cluster: <strong>{h(item.cluster_name)}</strong> ({h(item.cluster_type_display)}) | Mandal: <strong>{h(item.mandal_name)}</strong>
                         </div>
                         {item.contact_person && (
                             <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '4px' }}>
                                 <User size={10} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
-                                <strong>{item.contact_person}</strong> {item.contact_number && `(${item.contact_number})`}
+                                <strong>{h(item.contact_person)}</strong> {item.contact_number && `(${h(item.contact_number)})`}
                             </div>
                         )}
                         {item.address && (
                             <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '4px', fontStyle: 'italic' }}>
-                                {item.address}
+                                {h(item.address)}
                             </div>
                         )}
                     </td>
@@ -138,7 +140,7 @@ const GeoLocations = () => {
             default:
                 return (
                     <td>
-                        <div style={{ fontWeight: 600 }}>{item.name}</div>
+                        <div style={{ fontWeight: 600 }}>{h(item.name)}</div>
                     </td>
                 );
         }
