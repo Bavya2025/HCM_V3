@@ -1254,7 +1254,6 @@ class GeoClusterViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelVi
     ).all()
     serializer_class = GeoClusterSerializer
     upsert_lookup_fields = ['mandal', 'name']
-    pagination_class = None
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['^name', '^code', '^mandal__name']
     ordering_fields = ['name', 'created_at']
