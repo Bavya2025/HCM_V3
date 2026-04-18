@@ -421,7 +421,7 @@ export const DataProvider = ({ children }) => {
                         // Enforce multi-tab constraint immediately on startup for duplicated tabs
                         const sessionKey = `active_session_${userData.id}`;
                         const activeSession = JSON.parse(localStorage.getItem(sessionKey));
-                        
+
                         if (activeSession && activeSession.tabId !== tabId && (Date.now() - activeSession.lastSeen < 15000)) {
                             console.warn("Attempted to open a duplicate tab, blocking...");
                             sessionStorage.removeItem('authToken');
@@ -429,7 +429,7 @@ export const DataProvider = ({ children }) => {
                             setIsAuthenticated(false);
                             setUser(null);
                             setError('User already logged in in another tab. Please close other tabs first.');
-                            return; 
+                            return;
                         }
 
                         // Claim the session for this valid mount
@@ -826,7 +826,7 @@ export const DataProvider = ({ children }) => {
         setSelectedEmployee(null);
     };
 
-    const lastRequestedUrl = React.useRef(new Map()); 
+    const lastRequestedUrl = React.useRef(new Map());
     const activeRequests = React.useRef(new Map());
 
     const fetchData = async (silent = false, applyState = true, page = 1, filters = {}, force = false) => {
@@ -959,7 +959,7 @@ export const DataProvider = ({ children }) => {
             } catch (err) {
                 const sectionName = section ? section.name : 'requested';
                 console.error(`Failed to fetch ${requestSection}:`, err);
-                
+
                 // Always notify on errors that affect the ACTIVE view, even if fetch was silent
                 if (activeSectionRef.current === requestSection) {
                     setData([]);
@@ -1300,7 +1300,7 @@ export const DataProvider = ({ children }) => {
 
         // Inject geographical defaults (Continent: ASIA, Country: INDIA, State: ANDHRA PRADESH)
         const geoDefaults = {};
-        
+
         // Find IDs for hierarchical filters
         const asia = (geoContinents || []).find(c => String(c.name).toUpperCase() === 'ASIA');
         const india = (geoCountries || []).find(c => String(c.name).toUpperCase() === 'INDIA');

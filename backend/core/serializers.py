@@ -1315,7 +1315,7 @@ class EmployeeDropdownSerializer(serializers.ModelSerializer):
     """Ultra-lightweight serializer for dropdowns and search hints"""
     class Meta:
         model = Employee
-        fields = ['id', 'name', 'employee_code', 'status']
+        fields = ['id', 'name', 'employee_code', 'status', 'positions']
 
 
 

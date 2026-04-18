@@ -404,16 +404,16 @@ const GenericTable = ({ renderTableData, customData = null }) => {
     };
     const HighlightTerm = ({ text, term }) => {
         if (!term || !text) return <>{text}</>;
-        
+
         // Escape special regex characters in the term
         const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const parts = text.toString().split(new RegExp(`(${escapedTerm})`, 'gi'));
-        
+
         return (
             <>
                 {parts.map((part, i) => (
-                    part.toLowerCase() === term.toLowerCase() ? 
-                        <span key={i} style={{ backgroundColor: 'rgb(249 115 22 / 20%)', color: '#ea580c', fontWeight: 800, padding: '0 2px', borderRadius: '4px', borderBottom: '2px solid #f97316' }}>{part}</span> : 
+                    part.toLowerCase() === term.toLowerCase() ?
+                        <span key={i} style={{ backgroundColor: 'rgb(249 115 22 / 20%)', color: '#ea580c', fontWeight: 800, padding: '0 2px', borderRadius: '4px', borderBottom: '2px solid #f97316' }}>{part}</span> :
                         <span key={i}>{part}</span>
                 ))}
             </>
@@ -468,12 +468,12 @@ const GenericTable = ({ renderTableData, customData = null }) => {
                 // Combine visible fields that the user might want to search
                 // Local search across common fields
                 let searchableFields = [
-                    item.name, 
-                    item.employee_code, 
-                    item.code, 
-                    item.address, 
-                    item.district_name, 
-                    item.mandal_name, 
+                    item.name,
+                    item.employee_code,
+                    item.code,
+                    item.address,
+                    item.district_name,
+                    item.mandal_name,
                     item.state_name,
                     item.title
                 ];
@@ -581,8 +581,8 @@ const GenericTable = ({ renderTableData, customData = null }) => {
         if (clusterTypeFilter !== 'all') {
             result = result.filter(item =>
                 item && (
-                    item.cluster_type === clusterTypeFilter || 
-                    item.type === clusterTypeFilter || 
+                    item.cluster_type === clusterTypeFilter ||
+                    item.type === clusterTypeFilter ||
                     item.cluster_type_display === clusterTypeFilter
                 )
             );
@@ -889,7 +889,7 @@ const GenericTable = ({ renderTableData, customData = null }) => {
                                         errorMsg = 'Special characters not allowed in filters';
                                     }
                                     setSearchError(errorMsg);
-                                    
+
                                     const sanitized = raw.replace(/[^a-zA-Z0-9\- ]/g, '');
                                     setSearchTerm(sanitized);
                                 }}
@@ -1104,8 +1104,8 @@ const GenericTable = ({ renderTableData, customData = null }) => {
                                     .filter(s => {
                                         const sDeptId = (s.department && typeof s.department === 'object') ? s.department.id : s.department;
                                         const sDeptIdFinal = s.department_id || sDeptId;
-                                        const matchDept = departmentFilter === 'all' || 
-                                                        String(sDeptIdFinal) === String(departmentFilter);
+                                        const matchDept = departmentFilter === 'all' ||
+                                            String(sDeptIdFinal) === String(departmentFilter);
 
                                         // Improve office match by looking up department if needed
                                         let matchOffice = officeFilter === 'all';
