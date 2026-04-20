@@ -1,104 +1,69 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useData } from '../context/DataContext';
 import {
     FolderKanban, Users, Building2, Search,
     Globe, Briefcase, Activity, Target, PieChart,
-    ArrowUpRight, MapPin, ShieldCheck, Mail, Phone, BarChart3
+    ArrowUpRight, MapPin, ShieldCheck, Mail, Phone, BarChart3,
+    Zap, Sparkles, Filter, ChevronRight, Layers, Layout
 } from 'lucide-react';
 import { 
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
-    Legend, ResponsiveContainer, Cell, ReferenceLine 
+    Legend, ResponsiveContainer, Cell, ReferenceLine, AreaChart, Area
 } from 'recharts';
 
 const ProjectAnalyticsDashboard = () => {
     const { projects, offices, departments, sections, positions, allEmployees, loading } = useData();
     const [selectedProjectId, setSelectedProjectId] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [hoveredCard, setHoveredCard] = useState(null);
+
+    // Dynamic styles for the premium dark theme
+    const darkTheme = {
+        bg: '#030712',
+        surface: 'rgba(17, 24, 39, 0.7)',
+        glass: 'rgba(255, 255, 255, 0.03)',
+        border: 'rgba(255, 255, 255, 0.08)',
+        accent: '#f472b6', // Pink neon
+        accentSecondary: '#38bdf8', // Blue neon
+        accentTertiary: '#a855f7', // Purple neon
+        textMain: '#f9fafb',
+        textDim: '#9ca3af'
+    };
 
     // Pre-calculate stats for all projects with robust matching
     const projectStats = useMemo(() => {
         if (!projects || !offices) return [];
 
-        // Pre-create some lookup maps for speed
         const activeOffices = offices.filter(o => String(o.status || '').toLowerCase() === 'active');
         const activePositions = (positions || []).filter(p => String(p.status || '').toLowerCase() === 'active');
 
         return projects.map(proj => {
-            const projIdStr = String(proj.id);
-            const projName = String(proj.name || '').toLowerCase();
+            const projOffices = activeOffices.filter(o => 
+                String(o.project_id) === String(proj.id) || 
+                (proj.geo_scope === 'CLUSTER' && String(o.cluster_name).toLowerCase() === String(proj.cluster_name).toLowerCase())
+            );
+            
+            const officeIds = new Set(projOffices.map(o => String(o.id)));
+            const projDepts = (departments || []).filter(d => officeIds.has(String(d.office_id)));
+            const deptIds = new Set(projDepts.map(d => String(d.id)));
+            const projSecs = (sections || []).filter(s => deptIds.has(String(s.department_id)));
+            const sectionIds = new Set(projSecs.map(s => String(s.id)));
 
-            // 1. Find structural units mapped to this project
-            const projOffices = activeOffices.filter(o => {
-                const isProjectMatch = (o.assigned_projects || []).some(p => String(p).toLowerCase() === projName) ||
-                    String(o.project_id) === projIdStr;
-                if (isProjectMatch) return true;
-                if (proj.geo_scope_level) {
-                    const stateMatch = !proj.state_name || String(o.state_name || '').toLowerCase() === String(proj.state_name).toLowerCase();
-                    const districtMatch = !proj.district_name || String(o.district_name || '').toLowerCase() === String(proj.district_name).toLowerCase();
-                    const mandalMatch = !proj.mandal_name || String(o.mandal_name || '').toLowerCase() === String(proj.mandal_name).toLowerCase();
-                    const clusterMatch = !proj.cluster_name || String(o.cluster_name || '').toLowerCase() === String(proj.cluster_name).toLowerCase();
-
-                    if (proj.geo_scope_level === 'STATE') return stateMatch;
-                    if (proj.geo_scope_level === 'DISTRICT') return stateMatch && districtMatch;
-                    if (proj.geo_scope_level === 'MANDAL' || proj.geo_scope_level === 'VILLAGE') return stateMatch && districtMatch && mandalMatch;
-                    if (proj.geo_scope_level === 'CLUSTER') return clusterMatch;
-                }
-                return false;
-            });
-
-            const officeIdsSet = new Set(projOffices.map(o => String(o.id)));
-
-            const projDepts = (departments || []).filter(d => {
-                if (String(d.status || '').toLowerCase() !== 'active') return false;
-                const isProjectMatch = String(d.project) === projIdStr || String(d.project_id) === projIdStr;
-                return isProjectMatch || officeIdsSet.has(String(d.office || d.office_id));
-            });
-            const deptIdsSet = new Set(projDepts.map(d => String(d.id)));
-
-            const projSecs = (sections || []).filter(s => {
-                if (String(s.status || '').toLowerCase() !== 'active') return false;
-                const isProjectMatch = String(s.project) === projIdStr || String(s.project_id) === projIdStr;
-                return isProjectMatch || deptIdsSet.has(String(s.department || s.department_id));
-            });
-            const secIdsSet = new Set(projSecs.map(s => String(s.id)));
-
-            // 2. Map Positions to Units
-            const projPositions = activePositions.filter(p => {
-                return officeIdsSet.has(String(p.office || p.office_id)) ||
-                    deptIdsSet.has(String(p.department || p.department_id)) ||
-                    secIdsSet.has(String(p.section || s.section_id));
-            });
-
-            const positionIdsSet = new Set(projPositions.map(p => String(p.id)));
-
-            // 3. Map Employees to Positions (with enrichment)
+            const projPositions = activePositions.filter(p => 
+                sectionIds.has(String(p.section_id)) || 
+                deptIds.has(String(p.department_id)) || 
+                officeIds.has(String(p.office_id))
+            );
+            
+            const projPositionIds = new Set(projPositions.map(p => String(p.id)));
             const projEmployees = (allEmployees || []).filter(emp => {
-                const hasPosition = (emp.positions_details || []).some(pd => positionIdsSet.has(String(pd.id))) ||
-                    (emp.positions || []).some(posId => positionIdsSet.has(String(posId)));
-                return hasPosition && String(emp.status || '').toLowerCase() === 'active';
-            }).map(emp => {
-                if (emp.positions_details && emp.positions_details.length > 0) return emp;
-                const primaryPosId = emp.positions?.[0];
-                const posDetail = primaryPosId ? (positions || []).find(p => String(p.id) === String(primaryPosId)) : null;
-                if (posDetail) {
-                    return {
-                        ...emp,
-                        positions_details: [{
-                            id: posDetail.id,
-                            name: posDetail.name,
-                            level_name: posDetail.level_name,
-                            office_name: posDetail.office_name,
-                            office_id: posDetail.office_id
-                        }]
-                    };
-                }
-                return emp;
+                const empPosIds = Array.isArray(emp.positions) ? emp.positions : (emp.positions_details?.map(pd => pd.id) || []);
+                return empPosIds.some(pid => projPositionIds.has(String(pid)));
             });
 
             return {
                 ...proj,
                 totalUnits: projOffices.length + projDepts.length + projSecs.length,
-                totalOffices: projOffices.length,
                 totalPositions: projPositions.length,
                 totalEmployees: projEmployees.length,
                 totalVacancies: Math.max(0, projPositions.length - projEmployees.length),
@@ -108,14 +73,12 @@ const ProjectAnalyticsDashboard = () => {
         });
     }, [projects, offices, departments, sections, positions, allEmployees]);
 
-    // Overall Summary Stats
     const summary = useMemo(() => {
         const totalPos = projectStats.reduce((acc, p) => acc + p.totalPositions, 0);
         const totalEmp = projectStats.reduce((acc, p) => acc + p.totalEmployees, 0);
         return {
             totalProjects: projectStats.length,
             totalWorkforce: totalEmp,
-            totalActiveUnits: projectStats.reduce((acc, p) => acc + p.totalUnits, 0),
             totalVacancies: Math.max(0, totalPos - totalEmp),
             utilization: totalPos > 0 ? (totalEmp / totalPos * 100).toFixed(1) : 0
         };
@@ -124,9 +87,9 @@ const ProjectAnalyticsDashboard = () => {
     const chartData = useMemo(() => {
         return projectStats.map(p => ({
             name: p.name,
-            "Filled": p.totalEmployees,
-            "Vacant": p.totalVacancies,
-            "Capacity": p.totalPositions
+            Filled: p.totalEmployees,
+            Vacant: p.totalVacancies,
+            Capacity: p.totalPositions
         }));
     }, [projectStats]);
 
@@ -138,385 +101,379 @@ const ProjectAnalyticsDashboard = () => {
 
     const selectedProject = projectStats.find(p => String(p.id) === String(selectedProjectId));
 
-    if (loading) return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading Workspace Domain...</div>;
+    if (loading) return <div style={{ background: darkTheme.bg, height: '100vh', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Zap className="animate-pulse" size={48} color={darkTheme.accent} />
+    </div>;
 
     return (
-        <div className="fade-in stagger-in" style={{ paddingBottom: '5rem', width: '100%', maxWidth: '1600px', margin: '0 auto' }}>
+        <div style={{ 
+            background: darkTheme.bg,
+            minHeight: '100vh',
+            color: darkTheme.textMain,
+            padding: '2rem',
+            fontFamily: "'Inter', sans-serif",
+            overflowX: 'hidden'
+        }}>
+            {/* ─── GLOBAL BACKGROUND GLOWS ─── */}
+            <div style={{ position: 'fixed', top: '-10%', left: '-10%', width: '40%', height: '40%', background: `${darkTheme.accent}10`, filter: 'blur(150px)', pointerEvents: 'none' }} />
+            <div style={{ position: 'fixed', bottom: '-10%', right: '-10%', width: '40%', height: '40%', background: `${darkTheme.accentSecondary}10`, filter: 'blur(150px)', pointerEvents: 'none' }} />
 
-            {/* ─── PREMIUM HERO SECTION ─── */}
-            <div className="glass" style={{
-                padding: '3rem',
-                marginBottom: '2rem',
-                background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.85) 100%)',
-                position: 'relative',
-                overflow: 'hidden',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '2.5rem'
-            }}>
-                <div style={{ position: 'absolute', top: '-10%', right: '-5%', opacity: 0.03, transform: 'rotate(-15deg)' }}>
-                    <FolderKanban size={400} />
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div style={{ maxWidth: '1600px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
+                
+                {/* ─── PREMIUM HERO HEADER ─── */}
+                <div style={{ marginBottom: '4rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                     <div>
-                        <div style={{
-                            display: 'inline-flex', alignItems: 'center', gap: '8px',
-                            padding: '6px 12px', background: 'var(--primary-light)',
-                            borderRadius: '30px', color: 'var(--primary)',
-                            fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '1rem'
-                        }}>
-                            <Activity size={12} /> Live Workforce Analytics
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: darkTheme.accent, fontWeight: 800, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: '1rem' }}>
+                            <Sparkles size={16} /> Human Capital Command Center
                         </div>
-                        <h1 style={{ fontSize: '3rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.04em', lineHeight: 1 }}>
-                            Strategic <span style={{ color: 'var(--primary)' }}>Workforce</span> Domain
+                        <h1 style={{ fontSize: '4rem', fontWeight: 950, letterSpacing: '-0.05em', lineHeight: 0.9, marginBottom: '1.5rem' }}>
+                            Strategic <span style={{ 
+                                background: `linear-gradient(to right, ${darkTheme.accent}, ${darkTheme.accentSecondary})`,
+                                WebkitBackgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent'
+                            }}>Workforce</span> <br/> Operational Domain
                         </h1>
-                        <p style={{ color: '#64748b', fontSize: '1.1rem', marginTop: '16px', maxWidth: '550px', fontWeight: 500 }}>
-                            Comprehensive oversight of organizational project structures, human capital distribution, and site-level metrics.
+                        <p style={{ color: darkTheme.textDim, fontSize: '1.2rem', maxWidth: '600px' }}>
+                            Real-time organizational intelligence and resource optimization across all project verticals.
                         </p>
                     </div>
 
-                    <div style={{ position: 'relative', width: '400px' }}>
-                        <Search size={22} style={{ position: 'absolute', left: '18px', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary)' }} />
-                        <input
-                            type="text"
-                            placeholder="Find a project domain..."
+                    <div style={{ position: 'relative', minWidth: '450px' }}>
+                        <div style={{ 
+                            position: 'absolute', inset: 0, background: `linear-gradient(to right, ${darkTheme.accent}, ${darkTheme.accentSecondary})`,
+                            filter: 'blur(15px)', opacity: 0.1, borderRadius: '24px'
+                        }} />
+                        <Search style={{ position: 'absolute', left: '20px', top: '50%', transform: 'translateY(-50%)', color: darkTheme.accentSecondary }} size={24} />
+                        <input 
+                            type="text" 
+                            placeholder="Universal Search Domain..." 
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             style={{
-                                width: '100%', padding: '18px 20px 18px 54px',
-                                background: 'white', border: '1px solid #e2e8f0', borderRadius: '24px',
-                                fontSize: '1.05rem', fontWeight: 600, outline: 'none',
-                                boxShadow: '0 15px 35px -5px rgba(0,0,0,0.06)',
+                                width: '100%',
+                                padding: '22px 25px 22px 60px',
+                                background: 'rgba(255,255,255,0.05)',
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                borderRadius: '24px',
+                                color: 'white',
+                                fontSize: '1.1rem',
+                                fontWeight: 600,
+                                outline: 'none',
+                                backdropFilter: 'blur(10px)',
                                 transition: 'all 0.3s ease'
                             }}
+                            onFocus={(e) => e.target.style.borderColor = darkTheme.accentSecondary}
+                            onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
                         />
                     </div>
                 </div>
 
-                {/* SUMMARY STATS GRID */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '2rem' }}>
+                {/* ─── SUMMARY ANALYTICS ─── */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem', marginBottom: '3.5rem' }}>
                     {[
-                        { label: 'Domains', value: summary.totalProjects, icon: <FolderKanban />, color: 'var(--primary)' },
-                        { label: 'Workforce', value: summary.totalWorkforce, icon: <Users />, color: '#0ea5e9' },
-                        { label: 'Vacancies', value: summary.totalVacancies, icon: <Target />, color: '#f59e0b' },
-                        { label: 'Utilization', value: `${summary.utilization}%`, icon: <Activity />, color: '#10b981' }
+                        { label: 'DOMAINS', value: summary.totalProjects, icon: <Layout />, color: darkTheme.accentSecondary },
+                        { label: 'WORKFORCE', value: summary.totalWorkforce, icon: <Users />, color: darkTheme.accent },
+                        { label: 'VACANCIES', value: summary.totalVacancies, icon: <Target />, color: '#fbbf24' },
+                        { label: 'CAPACITY', value: `${summary.utilization}%`, icon: <Activity />, color: '#10b981' }
                     ].map((stat, i) => (
-                        <div key={i} style={{
-                            padding: '1.75rem', background: 'white', borderRadius: '24px',
-                            border: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: '20px',
-                            boxShadow: '0 10px 15px -10px rgba(0,0,0,0.04)',
-                            transition: 'all 0.3s ease'
+                        <div key={i} className="glass" style={{
+                            padding: '2rem',
+                            background: 'rgba(255,255,255,0.02)',
+                            borderRadius: '32px',
+                            border: '1px solid rgba(255,255,255,0.05)',
+                            backdropFilter: 'blur(20px)',
+                            position: 'relative',
+                            overflow: 'hidden'
                         }}>
-                            <div style={{
-                                width: '56px', height: '56px', borderRadius: '16px',
-                                background: `${stat.color}15`, color: stat.color,
-                                display: 'flex', alignItems: 'center', justifyContent: 'center'
-                            }}>
-                                {React.cloneElement(stat.icon, { size: 28 })}
-                            </div>
-                            <div>
-                                <div style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{stat.label}</div>
-                                <div style={{ fontSize: '1.75rem', fontWeight: 900, color: 'var(--text-main)' }}>{stat.value}</div>
+                            <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', background: stat.color }} />
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                                <div style={{ 
+                                    width: '60px', height: '60px', borderRadius: '18px', 
+                                    background: `${stat.color}10`, color: stat.color,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    boxShadow: `0 0 20px ${stat.color}20`
+                                }}>
+                                    {React.cloneElement(stat.icon, { size: 28 })}
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: '0.8rem', color: darkTheme.textDim, fontWeight: 800, letterSpacing: '0.1em' }}>{stat.label}</div>
+                                    <div style={{ fontSize: '2.2rem', fontWeight: 950, letterSpacing: '-0.02em' }}>{stat.value}</div>
+                                </div>
                             </div>
                         </div>
                     ))}
                 </div>
-            </div>
 
-            {/* ─── PROJECT ANALYTICS GRAPH ─── */}
-            <div className="glass stagger-item" style={{ marginBottom: '3.5rem', padding: '2.5rem', background: 'white' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2.5rem' }}>
-                    <div>
-                        <h3 style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <BarChart3 color="var(--primary)" size={28} /> Human Capital Inventory
-                        </h3>
-                        <p style={{ color: '#94a3b8', fontSize: '0.85rem', fontWeight: 500, marginTop: '4px' }}>
-                            Project-wise deployment and vacancy analysis
-                        </p>
+                {/* ─── DATA VISUALIZATION SECTION ─── */}
+                <div style={{ 
+                    padding: '2.5rem', 
+                    background: 'rgba(255,255,255,0.01)', 
+                    borderRadius: '40px', 
+                    border: '1px solid rgba(255,255,255,0.04)',
+                    marginBottom: '4rem',
+                    backdropFilter: 'blur(10px)'
+                }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem' }}>
+                        <div>
+                            <h2 style={{ fontSize: '1.8rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <BarChart3 size={28} color={darkTheme.accentSecondary} /> Domain Resilience Matrix
+                            </h2>
+                            <p style={{ color: darkTheme.textDim, fontSize: '0.9rem' }}>Comparative analysis of workforce deployment vs strategic capacity across all active domains.</p>
+                        </div>
+                        <div style={{ display: 'flex', gap: '2rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: darkTheme.accent }} />
+                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: darkTheme.textDim }}>DEPLOYED</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: 'rgba(255,255,255,0.1)' }} />
+                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: darkTheme.textDim }}>VACANT</span>
+                            </div>
+                        </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '1.5rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8' }}>
-                            <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: 'var(--primary)' }}></div> FILLED
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8' }}>
-                            <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: '#f59e0b' }}></div> VACANT
-                        </div>
+
+                    <div style={{ width: '100%', height: 400 }}>
+                        <ResponsiveContainer>
+                            <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 20 }}>
+                                <defs>
+                                    <linearGradient id="neonGradient" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="0%" stopColor={darkTheme.accent} stopOpacity={1} />
+                                        <stop offset="100%" stopColor={darkTheme.accentTertiary} stopOpacity={1} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.03)" />
+                                <XAxis 
+                                    dataKey="name" axisLine={false} tickLine={false} 
+                                    tick={{ fill: darkTheme.textDim, fontSize: 11, fontWeight: 700 }}
+                                    dy={10}
+                                />
+                                <YAxis 
+                                    axisLine={false} tickLine={false} 
+                                    tick={{ fill: darkTheme.textDim, fontSize: 11, fontWeight: 700 }}
+                                />
+                                <Tooltip 
+                                    cursor={{ fill: 'rgba(255,255,255,0.03)' }}
+                                    contentStyle={{ 
+                                        background: '#111827', border: '1px solid rgba(255,255,255,0.1)', 
+                                        borderRadius: '20px', padding: '15px', color: 'white',
+                                        boxShadow: '0 20px 40px rgba(0,0,0,0.4)'
+                                    }}
+                                />
+                                <Bar dataKey="Filled" stackId="a" fill="url(#neonGradient)" barSize={50} radius={[0, 0, 0, 0]} />
+                                <Bar dataKey="Vacant" stackId="a" fill="rgba(255,255,255,0.05)" barSize={50} radius={[10, 10, 0, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
                     </div>
                 </div>
 
-                <div style={{ width: '100%', height: 350 }}>
-                    <ResponsiveContainer>
-                        <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 20 }}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                            <XAxis 
-                                dataKey="name" 
-                                axisLine={false} 
-                                tickLine={false} 
-                                tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 700 }}
-                                interval={0}
-                                angle={-15}
-                                textAnchor="end"
-                                height={60}
-                            />
-                            <YAxis 
-                                axisLine={false} 
-                                tickLine={false} 
-                                tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 700 }}
-                            />
-                            <Tooltip 
-                                cursor={{ fill: 'rgba(0,0,0,0.02)' }}
-                                contentStyle={{ 
-                                    borderRadius: '16px', border: 'none', 
-                                    boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
-                                    padding: '15px'
+                {/* ─── PROJECT DOMAIN TILES ─── */}
+                <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', 
+                    gap: '2rem' 
+                }}>
+                    {filteredProjects.map((proj) => {
+                        const isSelected = String(proj.id) === String(selectedProjectId);
+                        const isHovered = hoveredCard === proj.id;
+                        
+                        return (
+                            <div 
+                                key={proj.id}
+                                onMouseEnter={() => setHoveredCard(proj.id)}
+                                onMouseLeave={() => setHoveredCard(null)}
+                                onClick={() => setSelectedProjectId(isSelected ? null : proj.id)}
+                                style={{
+                                    padding: '2.5rem',
+                                    background: isSelected ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.02)',
+                                    borderRadius: '40px',
+                                    border: `1px solid ${isSelected ? darkTheme.accentSecondary : 'rgba(255,255,255,0.05)'}`,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.6s cubic-bezier(0.16, 1, 0.3, 1)',
+                                    transform: isHovered 
+                                        ? 'translateY(-12px) scale(1.03) perspective(1000px) rotateX(2deg) rotateY(1deg)' 
+                                        : 'none',
+                                    boxShadow: isHovered 
+                                        ? `0 40px 80px rgba(0,0,0,0.5), 0 0 40px ${darkTheme.accentSecondary}30` 
+                                        : '0 10px 30px rgba(0,0,0,0.1)',
+                                    position: 'relative',
+                                    backdropFilter: 'blur(30px)',
+                                    overflow: 'hidden'
                                 }}
-                                itemStyle={{ fontWeight: 800, fontSize: '0.8rem' }}
-                                labelStyle={{ fontWeight: 900, marginBottom: '8px', color: 'var(--text-main)' }}
-                            />
-                            <Bar dataKey="Filled" stackId="a" fill="var(--primary)" barSize={45} />
-                            <Bar dataKey="Vacant" stackId="a" fill="#f59e0b" radius={[6, 6, 0, 0]} barSize={45} />
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
-
-            {/* ─── PROJECT SELECTION GRID ─── */}
-            <div style={{
-                display: 'grid',
-                gridTemplateColumns: selectedProjectId ? '380px 1fr' : 'repeat(auto-fill, minmax(340px, 1fr))',
-                gap: '2rem', transition: 'all 0.6s cubic-bezier(0.16, 1, 0.3, 1)'
-            }}>
-                {filteredProjects.map((proj) => {
-                    const isSelected = String(proj.id) === String(selectedProjectId);
-                    const isActive = proj.status === 'Active';
-
-                    return (
-                        <div key={proj.id}
-                            onClick={() => setSelectedProjectId(isSelected ? null : proj.id)}
-                            className="glass"
-                            style={{
-                                padding: '2.5rem',
-                                border: isSelected ? '2px solid var(--primary)' : '1px solid #f1f5f9',
-                                cursor: 'pointer', transition: 'all 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
-                                position: 'relative', overflow: 'hidden',
-                                transform: isSelected ? 'translateY(-8px) scale(1.02)' : 'none',
-                                background: isSelected ? 'white' : 'rgba(255,255,255,0.75)',
-                                boxShadow: isSelected ? '0 35px 70px -15px rgba(190, 24, 93, 0.18)' : 'var(--shadow-premium)'
-                            }}>
-
-                            {isSelected && (
-                                <div style={{
-                                    position: 'absolute', top: '20px', right: '20px',
-                                    width: '12px', height: '12px', borderRadius: '50%', background: 'var(--primary)',
-                                    boxShadow: '0 0 15px var(--primary)'
-                                }} />
-                            )}
-
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-                                <div style={{
-                                    width: '52px', height: '52px', borderRadius: '15px',
-                                    background: isSelected ? 'var(--primary)' : 'var(--primary-light)',
-                                    color: isSelected ? 'white' : 'var(--primary)',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    transition: 'all 0.3s ease'
-                                }}>
-                                    <Globe size={24} />
-                                </div>
-                                <div style={{
-                                    fontSize: '0.7rem', fontWeight: 800, padding: '6px 14px', borderRadius: '30px',
-                                    background: isActive ? '#dcfce7' : '#fee2e2', color: isActive ? '#16a34a' : '#ef4444',
-                                    textTransform: 'uppercase', letterSpacing: '0.05em'
-                                }}>
-                                    {proj.status?.toUpperCase() || 'ACTIVE'}
-                                </div>
-                            </div>
-
-                            <h3 style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--text-main)', marginBottom: '6px' }}>{proj.name}</h3>
-                            <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 600, marginBottom: '2.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <ShieldCheck size={14} color="var(--primary)" /> {proj.code}
-                            </div>
-
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-                                <div>
-                                    <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.05em' }}>Workforce</div>
-                                    <div style={{ fontSize: '1.5rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)' }}>
-                                        <Users size={18} color="var(--primary)" /> {proj.totalEmployees}
-                                    </div>
-                                </div>
-                                <div>
-                                    <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.05em' }}>Units</div>
-                                    <div style={{ fontSize: '1.5rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)' }}>
-                                        <Building2 size={18} color="#0ea5e9" /> {proj.totalUnits}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div style={{ marginTop: '2.5rem' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', alignItems: 'flex-end' }}>
-                                    <div>
-                                        <div style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Domain Utilization</div>
-                                        <div style={{ fontSize: '0.9rem', fontWeight: 900, color: 'var(--text-main)' }}>{Math.round(100 - proj.vacancyRate)}%</div>
-                                    </div>
-                                    <div style={{ fontSize: '0.7rem', fontWeight: 800, color: proj.totalVacancies > 0 ? '#f59e0b' : '#10b981' }}>
-                                        {proj.totalVacancies} Vacancies
-                                    </div>
-                                </div>
-                                <div style={{ height: '8px', background: '#f1f5f9', borderRadius: '15px', overflow: 'hidden' }}>
+                            >
+                                {/* HYPER-MOTION SHEEN EFFECT */}
+                                {isHovered && (
                                     <div style={{
-                                        width: `${Math.round(100 - proj.vacancyRate)}%`, height: '100%',
-                                        background: isSelected ? 'var(--primary)' : 'var(--sunset)', borderRadius: '15px',
-                                        transition: 'all 1.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                                        position: 'absolute', inset: 0,
+                                        background: 'linear-gradient(135deg, transparent 0%, rgba(255,255,255,0.06) 50%, transparent 100%)',
+                                        animation: 'sheen-glide 1.8s infinite',
+                                        pointerEvents: 'none',
+                                        zIndex: 1
                                     }} />
-                                </div>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
+                                )}
 
-            {/* ─── DETAIL VIEW AREA ─── */}
-            {selectedProject && (
-                <div className="fade-in" style={{ marginTop: '3.5rem' }}>
-                    <div className="glass" style={{ padding: '0', overflow: 'hidden', background: 'white' }}>
-
-                        {/* Detail Header */}
-                        <div style={{
-                            padding: '3rem 4rem', background: 'linear-gradient(90deg, #f8fafc 0%, white 100%)',
-                            borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-                        }}>
-                            <div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                                    <h2 style={{ fontSize: '2.25rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.03em' }}>
-                                        {selectedProject.name}
-                                    </h2>
-                                    <div style={{ padding: '6px 16px', background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: '30px', fontSize: '0.8rem', fontWeight: 800 }}>
-                                        DOMAIN ID: {selectedProject.code}
-                                    </div>
-                                </div>
-                                <div style={{ display: 'flex', gap: '20px', marginTop: '12px' }}>
-                                    <p style={{ color: '#64748b', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 500 }}>
-                                        <MapPin size={16} color="var(--primary)" /> Scope: {selectedProject.geo_scope_level || 'General'}
-                                    </p>
-                                    <p style={{ color: '#64748b', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 500 }}>
-                                        <Globe size={16} color="var(--primary)" /> Territoy: {selectedProject.state_name || 'All Territories'}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
-                                <div style={{ textAlign: 'right' }}>
-                                    <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Strategic Positions</div>
-                                    <div style={{ fontSize: '1.75rem', fontWeight: 900, color: 'var(--text-main)' }}>{selectedProject.totalPositions}</div>
-                                </div>
-                                <div style={{ width: '1px', height: '50px', background: '#e2e8f0', margin: '0 0.5rem' }} />
-                                <button className="btn-secondary" onClick={() => setSelectedProjectId(null)} style={{ height: '52px', padding: '0 24px', borderRadius: '18px', fontWeight: 800, border: '2px solid #f1f5f9' }}>
-                                    Exit Domain
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Detail Content Table */}
-                        <div style={{ padding: '3rem 4rem' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                                    <div style={{ width: '14px', height: '14px', borderRadius: '50%', background: 'var(--primary)', boxShadow: '0 0 10px var(--primary)' }} />
-                                    <h3 style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--text-main)' }}>Human Capital Manifest</h3>
-                                    <span style={{ fontSize: '0.9rem', color: 'var(--primary)', background: 'var(--primary-light)', padding: '4px 14px', borderRadius: '30px', fontWeight: 800 }}>{selectedProject.employees.length} Personnel Active</span>
-                                </div>
-                                <div style={{ display: 'flex', gap: '15px' }}>
-                                    <button className="btn-secondary" style={{ fontSize: '0.85rem', padding: '10px 20px', borderRadius: '14px' }}><PieChart size={16} style={{ marginRight: '8px' }} /> Unit Metrics</button>
-                                    <button className="btn-secondary" style={{ fontSize: '0.85rem', padding: '10px 20px', borderRadius: '14px' }}><ArrowUpRight size={16} style={{ marginRight: '8px' }} /> Export Domain Data</button>
-                                </div>
-                            </div>
-
-                            {selectedProject.employees.length > 0 ? (
-                                <div style={{ borderRadius: '28px', border: '1px solid #f1f5f9', overflow: 'hidden', boxShadow: '0 25px 50px -20px rgba(0,0,0,0.08)' }}>
-                                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                        <thead>
-                                            <tr style={{ background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
-                                                <th style={{ padding: '1.75rem 2.5rem', textAlign: 'left', fontSize: '0.8rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Member Identity</th>
-                                                <th style={{ padding: '1.75rem 2.5rem', textAlign: 'left', fontSize: '0.8rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Strategic Role</th>
-                                                <th style={{ padding: '1.75rem 2.5rem', textAlign: 'left', fontSize: '0.8rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Operational Node</th>
-                                                <th style={{ padding: '1.75rem 2.5rem', textAlign: 'right', fontSize: '0.8rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Communication</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {selectedProject.employees.map((emp, i) => (
-                                                <tr key={emp.id} style={{
-                                                    borderBottom: '1px solid #f8fafc', transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)', background: 'white'
-                                                }} onMouseOver={(e) => e.currentTarget.style.background = '#fffafb'} onMouseOut={(e) => e.currentTarget.style.background = 'white'}>
-                                                    <td style={{ padding: '1.5rem 2.5rem' }}>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                                                            <div style={{
-                                                                width: '52px', height: '52px', borderRadius: '16px',
-                                                                background: 'var(--fire)', color: 'white',
-                                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                                fontSize: '1.25rem', fontWeight: 900, boxShadow: '0 8px 16px -4px rgba(249, 115, 22, 0.3)'
-                                                            }}>
-                                                                {emp.name?.charAt(0)}
-                                                            </div>
-                                                            <div>
-                                                                <div style={{ fontWeight: 900, color: 'var(--text-main)', fontSize: '1.1rem', letterSpacing: '-0.02em' }}>{emp.name}</div>
-                                                                <div style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 700 }}>ID-REF: {emp.employee_code}</div>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td style={{ padding: '1.5rem 2.5rem' }}>
-                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                                            <span style={{ fontWeight: 800, color: '#475569', fontSize: '1.05rem', letterSpacing: '-0.01em' }}>{emp.positions_details?.[0]?.name || 'Domain Expert'}</span>
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                                <Briefcase size={12} color="var(--primary)" />
-                                                                <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 700 }}>LEVEL: {emp.positions_details?.[0]?.level_name?.toUpperCase() || 'STANDARD'}</span>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td style={{ padding: '1.5rem 2.5rem' }}>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#64748b', fontSize: '0.95rem', fontWeight: 700 }}>
-                                                            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                                <Building2 size={16} color="var(--primary)" />
-                                                            </div>
-                                                            {emp.positions_details?.[0]?.office_name || 'Central Deployment'}
-                                                        </div>
-                                                    </td>
-                                                    <td style={{ padding: '1.5rem 2.5rem', textAlign: 'right' }}>
-                                                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-                                                            <button style={{ width: '40px', height: '40px', borderRadius: '12px', border: '1px solid #f1f5f9', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)', transition: 'all 0.2s ease', cursor: 'pointer' }}>
-                                                                <Mail size={18} />
-                                                            </button>
-                                                            <button style={{ width: '40px', height: '40px', borderRadius: '12px', border: '1px solid #f1f5f9', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0ea5e9', transition: 'all 0.2s ease', cursor: 'pointer' }}>
-                                                                <Phone size={18} />
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            ) : (
-                                <div style={{
-                                    padding: '6rem 2rem', textAlign: 'center', background: '#f8fafc',
-                                    borderRadius: '40px', border: '2px dashed #e2e8f0'
-                                }}>
-                                    <div style={{
-                                        width: '100px', height: '100px', borderRadius: '30px', background: 'white',
-                                        margin: '0 auto 2rem auto', display: 'flex', alignItems: 'center',
-                                        justifyContent: 'center', boxShadow: '0 15px 35px rgba(0,0,0,0.08)',
-                                        animation: 'float-gentle 4s ease-in-out infinite'
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2.5rem', position: 'relative', zIndex: 2 }}>
+                                    <div style={{ 
+                                        width: '64px', height: '64px', borderRadius: '22px',
+                                        background: isSelected ? darkTheme.accentSecondary : 'rgba(255,255,255,0.05)',
+                                        color: isSelected ? 'white' : darkTheme.accentSecondary,
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        boxShadow: isSelected ? `0 0 30px ${darkTheme.accentSecondary}50` : 'none',
+                                        transition: 'all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                                        transform: isHovered ? 'scale(1.1) rotate(5deg)' : 'none'
                                     }}>
-                                        <Users size={48} color="#cbd5e1" />
+                                        <Globe size={32} />
                                     </div>
-                                    <h3 style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--text-main)', marginBottom: '0.75rem' }}>No Human Capital Assets Detected</h3>
-                                    <p style={{ color: '#94a3b8', fontSize: '1.1rem', maxWidth: '500px', margin: '0 auto', fontWeight: 600 }}>
-                                        Current analytics indicate no active personnel assigned to this project's structural units or geographical operational domains.
-                                    </p>
+                                    <div style={{ 
+                                        fontSize: '0.7rem', fontWeight: 900, padding: '8px 16px', borderRadius: '30px',
+                                        background: proj.status?.toLowerCase() === 'active' ? '#065f46' : '#991b1b',
+                                        color: 'white', letterSpacing: '0.1em',
+                                        display: 'flex', alignItems: 'center', gap: '8px',
+                                        boxShadow: proj.status?.toLowerCase() === 'active' ? '0 0 15px #10b98140' : 'none'
+                                    }}>
+                                        {proj.status?.toLowerCase() === 'active' && (
+                                            <div className="pulse-dot" style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} />
+                                        )}
+                                        {proj.status?.toUpperCase()}
+                                    </div>
                                 </div>
-                            )}
+
+                                <h3 style={{ fontSize: '1.8rem', fontWeight: 950, marginBottom: '0.5rem' }}>{proj.name}</h3>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: darkTheme.textDim, fontSize: '0.9rem', marginBottom: '3rem' }}>
+                                    <ShieldCheck size={16} color={darkTheme.accentSecondary} /> {proj.code}
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+                                    <div>
+                                        <div style={{ fontSize: '0.75rem', color: darkTheme.textDim, fontWeight: 800, textTransform: 'uppercase', marginBottom: '10px' }}>Active Personnel</div>
+                                        <div style={{ fontSize: '2rem', fontWeight: 950, display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                                            {proj.totalEmployees} <span style={{ fontSize: '0.9rem', color: darkTheme.textDim, fontWeight: 600 }}>units</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div style={{ fontSize: '0.75rem', color: darkTheme.textDim, fontWeight: 800, textTransform: 'uppercase', marginBottom: '10px' }}>Strategic Nodes</div>
+                                        <div style={{ fontSize: '2rem', fontWeight: 950, display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                                            {proj.totalUnits} <span style={{ fontSize: '0.9rem', color: darkTheme.textDim, fontWeight: 600 }}>units</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div style={{ marginTop: '2.5rem' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', alignItems: 'flex-end' }}>
+                                        <div style={{ fontSize: '0.7rem', color: darkTheme.textDim, fontWeight: 800 }}>UTILIZATION INDEX</div>
+                                        <div style={{ fontSize: '1.1rem', fontWeight: 950, color: darkTheme.accentSecondary }}>{Math.round(100 - proj.vacancyRate)}%</div>
+                                    </div>
+                                    <div style={{ height: '10px', background: 'rgba(255,255,255,0.05)', borderRadius: '20px', overflow: 'hidden' }}>
+                                        <div style={{ 
+                                            width: `${100 - proj.vacancyRate}%`, height: '100%', 
+                                            background: `linear-gradient(to right, ${darkTheme.accent}, ${darkTheme.accentSecondary})`,
+                                            borderRadius: '20px',
+                                            boxShadow: `0 0 15px ${darkTheme.accentSecondary}30`,
+                                            transition: 'width 1.5s cubic-bezier(0.16, 1, 0.3, 1)'
+                                        }} />
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {/* ─── DOMAIN PERSONNEL DRILL-DOWN ─── */}
+                {selectedProject && (
+                    <div style={{ marginTop: '5rem', animation: 'slide-up 0.6s ease-out' }}>
+                        <div style={{ 
+                            background: 'rgba(255,255,255,0.02)', 
+                            border: '1px solid rgba(255,255,255,0.08)',
+                            borderRadius: '50px',
+                            padding: '4rem',
+                            backdropFilter: 'blur(40px)'
+                        }}>
+                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem' }}>
+                                <div>
+                                    <h2 style={{ fontSize: '2.5rem', fontWeight: 950, marginBottom: '0.5rem' }}>Human Capital Manifest</h2>
+                                    <p style={{ color: darkTheme.textDim }}>Personnel resource allocation for <strong>{selectedProject.name}</strong></p>
+                                </div>
+                                <div style={{ 
+                                    padding: '1.5rem 2.5rem', background: 'rgba(255,255,255,0.05)', borderRadius: '24px',
+                                    display: 'flex', flexDir: 'column', alignItems: 'flex-end'
+                                }}>
+                                    <span style={{ fontSize: '0.7rem', fontWeight: 900, color: darkTheme.textDim }}>CURRENT DEPLOYMENT</span>
+                                    <span style={{ fontSize: '2rem', fontWeight: 950, color: darkTheme.accent }}>{selectedProject.totalEmployees} / {selectedProject.totalPositions}</span>
+                                </div>
+                             </div>
+
+                             {selectedProject.employees?.length > 0 ? (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '1.5rem' }}>
+                                    {selectedProject.employees.map((emp, i) => (
+                                        <div key={emp.id} style={{
+                                            padding: '1.5rem',
+                                            background: 'rgba(255,255,255,0.03)',
+                                            borderRadius: '24px',
+                                            border: '1px solid rgba(255,255,255,0.05)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '1.25rem',
+                                            transition: 'transform 0.3s ease'
+                                        }}>
+                                            <div style={{ 
+                                                width: '50px', height: '50px', borderRadius: '50%', 
+                                                background: `linear-gradient(45deg, ${darkTheme.accent}, ${darkTheme.accentSecondary})`,
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                fontSize: '1.1rem', fontWeight: 900, color: 'white'
+                                            }}>
+                                                {emp.name?.charAt(0)}
+                                            </div>
+                                            <div>
+                                                <div style={{ fontSize: '1.1rem', fontWeight: 800 }}>{emp.name}</div>
+                                                <div style={{ fontSize: '0.75rem', color: darkTheme.textDim, fontWeight: 600 }}>{emp.employee_code}</div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                             ) : (
+                                <div style={{ padding: '5rem', textAlign: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '30px' }}>
+                                    <Users size={64} style={{ opacity: 0.1, marginBottom: '1.5rem' }} />
+                                    <h3 style={{ fontSize: '1.5rem', fontWeight: 800 }}>No Active Personnel Detected</h3>
+                                    <p style={{ color: darkTheme.textDim }}>Current records indicate no staffing assigned to this domain.</p>
+                                </div>
+                             )}
                         </div>
                     </div>
-                </div>
-            )}
+                )}
+            </div>
+
+            <style>{`
+                @keyframes slide-up {
+                    from { transform: translateY(50px); opacity: 0; }
+                    to { transform: translateY(0); opacity: 1; }
+                }
+                .glass:hover {
+                    border-color: rgba(255,255,255,0.2) !important;
+                    background: rgba(255,255,255,0.05) !important;
+                }
+                @keyframes float-gentle {
+                    0% { transform: translateY(0px); }
+                    50% { transform: translateY(-10px); }
+                    100% { transform: translateY(0px); }
+                }
+                @keyframes sheen-glide {
+                    0% { transform: translateX(-100%) skewX(-20deg); }
+                    100% { transform: translateX(100%) skewX(-20deg); opacity: 0; }
+                }
+                @keyframes pulse-soft {
+                    0% { transform: scale(1); opacity: 1; }
+                    50% { transform: scale(1.5); opacity: 0.3; }
+                    100% { transform: scale(1); opacity: 1; }
+                }
+                .pulse-dot {
+                    animation: pulse-soft 2s infinite ease-in-out;
+                }
+                .stagger-item {
+                    transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+                }
+                .stagger-item:hover {
+                    background: rgba(255,255,255,0.04) !important;
+                }
+            `}</style>
         </div>
     );
 };
