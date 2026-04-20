@@ -1625,95 +1625,173 @@ const Success = ({ keyStr, onClose, showNotification }) => (
     </div>
 );
 
-const UsageLogs = ({ title, logs, loading, onClose }) => (
-    <div className="modal-overlay" style={{ zIndex: 3000 }}>
-        <div className="modal-content" style={{ maxWidth: '900px', height: '85vh' }}>
-            {/* Header */}
-            <div style={{
-                padding: '1.5rem 2rem',
-                borderBottom: '2px solid #f1f5f9',
+const UsageLogs = ({ title, logs, loading, onClose }) => {
+    const auditTheme = {
+        bg: '#030712',
+        card: 'rgba(255, 255, 255, 0.03)',
+        border: 'rgba(255, 255, 255, 0.08)',
+        textMain: '#f9fafb',
+        textDim: '#94a3b8',
+        cyan: '#06b6d4',
+        emerald: '#10b981',
+        amber: '#f59e0b',
+        crimson: '#ef4444'
+    };
+
+    return (
+        <div className="modal-overlay" style={{ zIndex: 3000, backdropFilter: 'blur(20px)', background: 'rgba(0,0,0,0.8)' }}>
+            <div className="modal-content" style={{ 
+                maxWidth: '1000px', 
+                height: '85vh', 
+                background: auditTheme.bg,
+                border: `1px solid ${auditTheme.border}`,
+                boxShadow: '0 0 100px rgba(0,0,0,1)',
                 display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                background: 'white'
+                flexDirection: 'column',
+                overflow: 'hidden',
+                borderRadius: '40px'
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <div style={{
-                        padding: '10px',
-                        background: 'rgba(99, 102, 241, 0.1)',
-                        color: '#6366f1',
-                        borderRadius: '12px'
-                    }}>
-                        <History size={24} />
+                {/* ─── CRYPTOGRAPHIC HEADER ─── */}
+                <div style={{
+                    padding: '2rem 3rem',
+                    borderBottom: `1px solid ${auditTheme.border}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    background: 'rgba(255,255,255,0.01)',
+                    position: 'relative',
+                    zIndex: 2
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                        <div style={{
+                            width: '56px', height: '56px', borderRadius: '16px',
+                            background: 'rgba(99, 102, 241, 0.1)',
+                            color: '#818cf8',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            boxShadow: '0 0 20px rgba(129, 140, 248, 0.2)'
+                        }}>
+                            <History size={28} className="pulse-slow" />
+                        </div>
+                        <div>
+                            <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900, color: auditTheme.textMain, letterSpacing: '-0.02em' }}>{title}</h3>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: auditTheme.emerald, animation: 'pulse-soft 2s infinite' }} />
+                                <span style={{ fontSize: '0.85rem', color: auditTheme.textDim, fontWeight: 700, letterSpacing: '0.05em' }}>REAL-TIME GATEWAY AUDIT</span>
+                            </div>
+                        </div>
                     </div>
-                    <div>
-                        <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#1e293b' }}>{title}</h3>
-                        <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>Real-time cryptographic access audit</p>
-                    </div>
+                    <button 
+                        onClick={onClose} 
+                        style={{ 
+                            width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(255,255,255,0.05)', 
+                            border: '1px solid rgba(255,255,255,0.1)', color: 'white', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center'
+                        }}
+                    >
+                        <X size={24} />
+                    </button>
                 </div>
-                <button onClick={onClose} className="nav-icon-btn"><X size={20} /></button>
+
+                {/* ─── AUDIT LOG STREAM ─── */}
+                <div style={{ flex: 1, overflowY: 'auto', padding: '2rem 3rem', background: 'transparent', position: 'relative' }}>
+                    {loading ? (
+                        <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <div className="bounce-loader" style={{ fontSize: '1.2rem', color: auditTheme.cyan, fontWeight: 800 }}>AUDITING VAULT STREAM...</div>
+                        </div>
+                    ) : logs.length === 0 ? (
+                        <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: auditTheme.textDim, opacity: 0.5 }}>
+                            <History size={64} style={{ marginBottom: '1.5rem' }} />
+                            <p style={{ fontWeight: 800, fontSize: '1.1rem' }}>VAULT EMPTY: NO RECENT ENTRIES</p>
+                        </div>
+                    ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                            {logs.map((log, i) => {
+                                const methodColors = {
+                                    GET: auditTheme.cyan,
+                                    POST: auditTheme.emerald,
+                                    PUT: auditTheme.amber,
+                                    DELETE: auditTheme.crimson
+                                };
+                                const color = methodColors[log.method] || auditTheme.textDim;
+
+                                return (
+                                    <div key={log.id} style={{
+                                        padding: '1.25rem 2rem',
+                                        background: auditTheme.card,
+                                        borderRadius: '20px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        border: `1px solid ${auditTheme.border}`,
+                                        animation: `slideLeft 0.4s ease-out ${i * 0.03}s both`,
+                                        backdropFilter: 'blur(10px)',
+                                        position: 'relative'
+                                    }}>
+                                        <div style={{ position: 'absolute', left: 0, top: '25%', bottom: '25%', width: '3px', background: color, borderRadius: '0 4px 4px 0', boxShadow: `0 0 10px ${color}` }} />
+                                        
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+                                            <div style={{
+                                                padding: '6px 14px',
+                                                background: `${color}15`,
+                                                color: color,
+                                                borderRadius: '8px',
+                                                fontSize: '0.75rem',
+                                                fontWeight: 950,
+                                                letterSpacing: '0.05em',
+                                                border: `1px solid ${color}30`
+                                            }}>
+                                                {log.method}
+                                            </div>
+                                            <div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                    <span style={{ fontWeight: 900, color: auditTheme.textMain, fontSize: '1.05rem' }}>{log.api_key_name}</span>
+                                                    <span style={{ fontSize: '0.8rem', color: auditTheme.textDim, fontWeight: 800, fontFamily: 'monospace', opacity: 0.7 }}>{log.ip_address}</span>
+                                                </div>
+                                                <div style={{ fontSize: '0.85rem', color: auditTheme.textDim, fontWeight: 600, marginTop: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <Globe size={14} color={color} /> 
+                                                    <span style={{ color: auditTheme.textMain, opacity: 0.8 }}>{log.endpoint}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div style={{ textAlign: 'right' }}>
+                                            <div style={{ fontSize: '1rem', fontWeight: 900, color: auditTheme.textMain, display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'flex-end' }}>
+                                                <Clock size={16} color={auditTheme.cyan} /> {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                            </div>
+                                            <div style={{ fontSize: '0.75rem', color: auditTheme.textDim, fontWeight: 800, marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                {new Date(log.timestamp).toLocaleDateString()}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+
+                {/* ─── FOOTER METRIC ─── */}
+                <div style={{ padding: '1rem 3rem', background: 'rgba(255,255,255,0.02)', borderTop: `1px solid ${auditTheme.border}`, display: 'flex', justifyContent: 'center' }}>
+                     <div style={{ fontSize: '0.75rem', color: auditTheme.textDim, fontWeight: 800, letterSpacing: '0.1em' }}>
+                        SECURE LOG STREAM TERMINATED • {logs.length} ENTRIES CACHED
+                     </div>
+                </div>
             </div>
 
-            {/* Content */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', background: '#f8fafc' }}>
-                {loading ? (
-                    <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <BavyaSpinner label="Auditing Vault Logs..." />
-                    </div>
-                ) : logs.length === 0 ? (
-                    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>
-                        <History size={48} style={{ opacity: 0.2, marginBottom: '1rem' }} />
-                        <p style={{ fontWeight: 600 }}>No usage records found for this period</p>
-                    </div>
-                ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                        {logs.map((log, i) => (
-                            <div key={log.id} className="glass" style={{
-                                padding: '1rem 1.5rem',
-                                background: 'white',
-                                borderRadius: '14px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                border: '1px solid #f1f5f9',
-                                animation: `fadeIn 0.3s ease-out ${i * 0.05}s both`
-                            }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-                                    <div style={{
-                                        width: '40px', height: '40px', borderRadius: '10px',
-                                        background: log.method === 'GET' ? '#eff6ff' : '#ecfdf5',
-                                        color: log.method === 'GET' ? '#3b82f6' : '#10b981',
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        fontSize: '0.7rem', fontWeight: 900
-                                    }}>
-                                        {log.method}
-                                    </div>
-                                    <div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <span style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.9rem' }}>{log.api_key_name}</span>
-                                            <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700 }}>•</span>
-                                            <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, fontFamily: 'monospace' }}>{log.ip_address}</span>
-                                        </div>
-                                        <div style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 500, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            <Globe size={12} /> {log.endpoint}
-                                        </div>
-                                    </div>
-                                </div>
-                                <div style={{ textAlign: 'right' }}>
-                                    <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#475569', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
-                                        <Clock size={14} /> {new Date(log.timestamp).toLocaleTimeString()}
-                                    </div>
-                                    <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700 }}>
-                                        {new Date(log.timestamp).toLocaleDateString()}
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
+            <style>{`
+                @keyframes slideLeft {
+                    from { transform: translateX(30px); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+                .pulse-slow {
+                    animation: float-gentle 4s ease-in-out infinite;
+                }
+                @keyframes float-gentle {
+                    0%, 100% { transform: translateY(0); }
+                    50% { transform: translateY(-5px); }
+                }
+            `}</style>
         </div>
-    </div>
-);
+    );
+};
 
 export default APIKeyManagement;
