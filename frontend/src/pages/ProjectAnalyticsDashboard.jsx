@@ -3,8 +3,12 @@ import { useData } from '../context/DataContext';
 import {
     FolderKanban, Users, Building2, Search,
     Globe, Briefcase, Activity, Target, PieChart,
-    ArrowUpRight, MapPin, ShieldCheck, Mail, Phone
+    ArrowUpRight, MapPin, ShieldCheck, Mail, Phone, BarChart3
 } from 'lucide-react';
+import { 
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
+    Legend, ResponsiveContainer, Cell, ReferenceLine 
+} from 'recharts';
 
 const ProjectAnalyticsDashboard = () => {
     const { projects, offices, departments, sections, positions, allEmployees, loading } = useData();
@@ -117,6 +121,15 @@ const ProjectAnalyticsDashboard = () => {
         };
     }, [projectStats]);
 
+    const chartData = useMemo(() => {
+        return projectStats.map(p => ({
+            name: p.name,
+            "Filled": p.totalEmployees,
+            "Vacant": p.totalVacancies,
+            "Capacity": p.totalPositions
+        }));
+    }, [projectStats]);
+
     const filteredProjects = useMemo(() => {
         if (!searchQuery) return projectStats;
         const q = searchQuery.toLowerCase();
@@ -208,6 +221,63 @@ const ProjectAnalyticsDashboard = () => {
                             </div>
                         </div>
                     ))}
+                </div>
+            </div>
+
+            {/* ─── PROJECT ANALYTICS GRAPH ─── */}
+            <div className="glass stagger-item" style={{ marginBottom: '3.5rem', padding: '2.5rem', background: 'white' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2.5rem' }}>
+                    <div>
+                        <h3 style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <BarChart3 color="var(--primary)" size={28} /> Human Capital Inventory
+                        </h3>
+                        <p style={{ color: '#94a3b8', fontSize: '0.85rem', fontWeight: 500, marginTop: '4px' }}>
+                            Project-wise deployment and vacancy analysis
+                        </p>
+                    </div>
+                    <div style={{ display: 'flex', gap: '1.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8' }}>
+                            <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: 'var(--primary)' }}></div> FILLED
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8' }}>
+                            <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: '#f59e0b' }}></div> VACANT
+                        </div>
+                    </div>
+                </div>
+
+                <div style={{ width: '100%', height: 350 }}>
+                    <ResponsiveContainer>
+                        <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 20 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                            <XAxis 
+                                dataKey="name" 
+                                axisLine={false} 
+                                tickLine={false} 
+                                tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 700 }}
+                                interval={0}
+                                angle={-15}
+                                textAnchor="end"
+                                height={60}
+                            />
+                            <YAxis 
+                                axisLine={false} 
+                                tickLine={false} 
+                                tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 700 }}
+                            />
+                            <Tooltip 
+                                cursor={{ fill: 'rgba(0,0,0,0.02)' }}
+                                contentStyle={{ 
+                                    borderRadius: '16px', border: 'none', 
+                                    boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
+                                    padding: '15px'
+                                }}
+                                itemStyle={{ fontWeight: 800, fontSize: '0.8rem' }}
+                                labelStyle={{ fontWeight: 900, marginBottom: '8px', color: 'var(--text-main)' }}
+                            />
+                            <Bar dataKey="Filled" stackId="a" fill="var(--primary)" barSize={45} />
+                            <Bar dataKey="Vacant" stackId="a" fill="#f59e0b" radius={[6, 6, 0, 0]} barSize={45} />
+                        </BarChart>
+                    </ResponsiveContainer>
                 </div>
             </div>
 
