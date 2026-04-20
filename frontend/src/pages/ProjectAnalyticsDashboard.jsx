@@ -4,7 +4,7 @@ import {
     FolderKanban, Users, Building2, Search,
     Globe, Briefcase, Activity, Target, PieChart,
     ArrowUpRight, MapPin, ShieldCheck, Mail, Phone, BarChart3,
-    Zap, Sparkles, Filter, ChevronRight, Layers, Layout
+    Zap, Sparkles, Filter, ChevronRight, Layers, Layout, ChevronDown, ChevronUp, X
 } from 'lucide-react';
 import { 
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
@@ -15,7 +15,33 @@ const ProjectAnalyticsDashboard = () => {
     const { projects, offices, departments, sections, positions, allEmployees, loading } = useData();
     const [selectedProjectId, setSelectedProjectId] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [employeeSearch, setEmployeeSearch] = useState('');
     const [hoveredCard, setHoveredCard] = useState(null);
+    const [showGraph, setShowGraph] = useState(false);
+
+    // Helper component for visual search highlighting
+    const HighlightText = ({ text, highlight }) => {
+        if (!highlight || !highlight.trim()) return <span>{text}</span>;
+        const parts = String(text).split(new RegExp(`(${highlight})`, 'gi'));
+        return (
+            <span>
+                {parts.map((part, i) => 
+                    part.toLowerCase() === highlight.toLowerCase() ? (
+                        <span key={i} style={{ 
+                            background: `rgba(56, 189, 248, 0.2)`, 
+                            color: '#38bdf8',
+                            padding: '0 2px',
+                            borderRadius: '4px',
+                            textShadow: `0 0 10px rgba(56, 189, 248, 0.4)`,
+                            fontWeight: 900
+                        }}>
+                            {part}
+                        </span>
+                    ) : part
+                )}
+            </span>
+        );
+    };
 
     // Dynamic styles for the premium dark theme
     const darkTheme = {
@@ -23,14 +49,14 @@ const ProjectAnalyticsDashboard = () => {
         surface: 'rgba(17, 24, 39, 0.7)',
         glass: 'rgba(255, 255, 255, 0.03)',
         border: 'rgba(255, 255, 255, 0.08)',
-        accent: '#f472b6', // Pink neon
-        accentSecondary: '#38bdf8', // Blue neon
-        accentTertiary: '#a855f7', // Purple neon
+        accent: '#f472b6', 
+        accentSecondary: '#38bdf8', 
+        accentTertiary: '#a855f7', 
         textMain: '#f9fafb',
         textDim: '#9ca3af'
     };
 
-    // Pre-calculate stats for all projects with robust matching
+    // Pre-calculate stats for all projects
     const projectStats = useMemo(() => {
         if (!projects || !offices) return [];
 
@@ -59,7 +85,7 @@ const ProjectAnalyticsDashboard = () => {
             const projEmployees = (allEmployees || []).filter(emp => {
                 const empPosIds = Array.isArray(emp.positions) ? emp.positions : (emp.positions_details?.map(pd => pd.id) || []);
                 return empPosIds.some(pid => projPositionIds.has(String(pid)));
-            });
+            }).sort((a,b) => (a.name || '').localeCompare(b.name || ''));
 
             return {
                 ...proj,
@@ -94,12 +120,26 @@ const ProjectAnalyticsDashboard = () => {
     }, [projectStats]);
 
     const filteredProjects = useMemo(() => {
-        if (!searchQuery) return projectStats;
-        const q = searchQuery.toLowerCase();
-        return projectStats.filter(p => p.name?.toLowerCase().includes(q) || p.code?.toLowerCase().includes(q));
+        const q = searchQuery.toLowerCase().trim();
+        if (!q) return projectStats;
+        return projectStats.filter(p => 
+            (p.name?.toLowerCase().includes(q)) || 
+            (p.code?.toLowerCase().includes(q)) ||
+            (p.cluster_name?.toLowerCase().includes(q))
+        );
     }, [projectStats, searchQuery]);
 
     const selectedProject = projectStats.find(p => String(p.id) === String(selectedProjectId));
+
+    const manifestEmployees = useMemo(() => {
+        if (!selectedProject) return [];
+        const q = employeeSearch.toLowerCase().trim();
+        if (!q) return selectedProject.employees;
+        return selectedProject.employees.filter(e => 
+            e.name?.toLowerCase().includes(q) || 
+            e.employee_code?.toLowerCase().includes(q)
+        );
+    }, [selectedProject, employeeSearch]);
 
     if (loading) return <div style={{ background: darkTheme.bg, height: '100vh', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Zap className="animate-pulse" size={48} color={darkTheme.accent} />
@@ -121,24 +161,24 @@ const ProjectAnalyticsDashboard = () => {
             <div style={{ maxWidth: '1600px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
                 
                 {/* ─── PREMIUM HERO HEADER ─── */}
-                <div style={{ marginBottom: '4rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                    <div>
+                <div style={{ marginBottom: '4rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '2rem', flexWrap: 'wrap' }}>
+                    <div className="fade-in-up">
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: darkTheme.accent, fontWeight: 800, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: '1rem' }}>
                             <Sparkles size={16} /> Human Capital Command Center
                         </div>
-                        <h1 style={{ fontSize: '4rem', fontWeight: 950, letterSpacing: '-0.05em', lineHeight: 0.9, marginBottom: '1.5rem' }}>
+                        <h1 style={{ fontSize: '3.5rem', fontWeight: 950, letterSpacing: '-0.05em', lineHeight: 0.9, marginBottom: '1.5rem' }}>
                             Strategic <span style={{ 
                                 background: `linear-gradient(to right, ${darkTheme.accent}, ${darkTheme.accentSecondary})`,
                                 WebkitBackgroundClip: 'text',
                                 WebkitTextFillColor: 'transparent'
                             }}>Workforce</span> <br/> Operational Domain
                         </h1>
-                        <p style={{ color: darkTheme.textDim, fontSize: '1.2rem', maxWidth: '600px' }}>
+                        <p style={{ color: darkTheme.textDim, fontSize: '1.1rem', maxWidth: '600px' }}>
                             Real-time organizational intelligence and resource optimization across all project verticals.
                         </p>
                     </div>
 
-                    <div style={{ position: 'relative', minWidth: '450px' }}>
+                    <div className="fade-in-up" style={{ position: 'relative', minWidth: '400px', animationDelay: '0.1s' }}>
                         <div style={{ 
                             position: 'absolute', inset: 0, background: `linear-gradient(to right, ${darkTheme.accent}, ${darkTheme.accentSecondary})`,
                             filter: 'blur(15px)', opacity: 0.1, borderRadius: '24px'
@@ -146,12 +186,12 @@ const ProjectAnalyticsDashboard = () => {
                         <Search style={{ position: 'absolute', left: '20px', top: '50%', transform: 'translateY(-50%)', color: darkTheme.accentSecondary }} size={24} />
                         <input 
                             type="text" 
-                            placeholder="Universal Search Domain..." 
+                            placeholder="Search Domains or Project Codes..." 
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             style={{
                                 width: '100%',
-                                padding: '22px 25px 22px 60px',
+                                padding: '20px 25px 20px 60px',
                                 background: 'rgba(255,255,255,0.05)',
                                 border: '1px solid rgba(255,255,255,0.1)',
                                 borderRadius: '24px',
@@ -162,28 +202,27 @@ const ProjectAnalyticsDashboard = () => {
                                 backdropFilter: 'blur(10px)',
                                 transition: 'all 0.3s ease'
                             }}
-                            onFocus={(e) => e.target.style.borderColor = darkTheme.accentSecondary}
-                            onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
                         />
                     </div>
                 </div>
 
                 {/* ─── SUMMARY ANALYTICS ─── */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem', marginBottom: '3.5rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem', marginBottom: '3rem' }}>
                     {[
                         { label: 'DOMAINS', value: summary.totalProjects, icon: <Layout />, color: darkTheme.accentSecondary },
                         { label: 'WORKFORCE', value: summary.totalWorkforce, icon: <Users />, color: darkTheme.accent },
                         { label: 'VACANCIES', value: summary.totalVacancies, icon: <Target />, color: '#fbbf24' },
                         { label: 'CAPACITY', value: `${summary.utilization}%`, icon: <Activity />, color: '#10b981' }
                     ].map((stat, i) => (
-                        <div key={i} className="glass" style={{
+                        <div key={i} className="glass fade-in-up" style={{
                             padding: '2rem',
                             background: 'rgba(255,255,255,0.02)',
                             borderRadius: '32px',
                             border: '1px solid rgba(255,255,255,0.05)',
                             backdropFilter: 'blur(20px)',
                             position: 'relative',
-                            overflow: 'hidden'
+                            overflow: 'hidden',
+                            animationDelay: `${i * 0.1}s`
                         }}>
                             <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', background: stat.color }} />
                             <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
@@ -204,77 +243,116 @@ const ProjectAnalyticsDashboard = () => {
                     ))}
                 </div>
 
-                {/* ─── DATA VISUALIZATION SECTION ─── */}
-                <div style={{ 
-                    padding: '2.5rem', 
-                    background: 'rgba(255,255,255,0.01)', 
-                    borderRadius: '40px', 
-                    border: '1px solid rgba(255,255,255,0.04)',
-                    marginBottom: '4rem',
-                    backdropFilter: 'blur(10px)'
-                }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem' }}>
-                        <div>
-                            <h2 style={{ fontSize: '1.8rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <BarChart3 size={28} color={darkTheme.accentSecondary} /> Domain Resilience Matrix
-                            </h2>
-                            <p style={{ color: darkTheme.textDim, fontSize: '0.9rem' }}>Comparative analysis of workforce deployment vs strategic capacity across all active domains.</p>
-                        </div>
-                        <div style={{ display: 'flex', gap: '2rem' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: darkTheme.accent }} />
-                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: darkTheme.textDim }}>DEPLOYED</span>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: 'rgba(255,255,255,0.1)' }} />
-                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: darkTheme.textDim }}>VACANT</span>
-                            </div>
-                        </div>
-                    </div>
+                {/* ─── TOGGLEABLE GLOBAL ANALYTICS ─── */}
+                <div style={{ marginBottom: '4rem' }}>
+                    <button 
+                        onClick={() => setShowGraph(!showGraph)}
+                        style={{
+                            width: '100%',
+                            padding: '1.5rem',
+                            background: 'rgba(255,255,255,0.03)',
+                            border: '1px solid rgba(255,255,255,0.08)',
+                            borderRadius: '24px',
+                            color: 'white',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '15px',
+                            cursor: 'pointer',
+                            fontSize: '1rem',
+                            fontWeight: 800,
+                            letterSpacing: '0.05em',
+                            transition: 'all 0.3s ease',
+                            backdropFilter: 'blur(10px)'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
+                    >
+                        {showGraph ? <ChevronUp size={24} color={darkTheme.accentSecondary} /> : <ChevronDown size={24} color={darkTheme.accentSecondary} />}
+                        {showGraph ? 'HIDE DOMAIN INTELLIGENCE MATRIX' : 'SHOW DOMAIN INTELLIGENCE MATRIX'}
+                        <BarChart3 size={20} color={darkTheme.accentSecondary} />
+                    </button>
 
-                    <div style={{ width: '100%', height: 400 }}>
-                        <ResponsiveContainer>
-                            <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 20 }}>
-                                <defs>
-                                    <linearGradient id="neonGradient" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="0%" stopColor={darkTheme.accent} stopOpacity={1} />
-                                        <stop offset="100%" stopColor={darkTheme.accentTertiary} stopOpacity={1} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.03)" />
-                                <XAxis 
-                                    dataKey="name" axisLine={false} tickLine={false} 
-                                    tick={{ fill: darkTheme.textDim, fontSize: 11, fontWeight: 700 }}
-                                    dy={10}
-                                />
-                                <YAxis 
-                                    axisLine={false} tickLine={false} 
-                                    tick={{ fill: darkTheme.textDim, fontSize: 11, fontWeight: 700 }}
-                                />
-                                <Tooltip 
-                                    cursor={{ fill: 'rgba(255,255,255,0.03)' }}
-                                    contentStyle={{ 
-                                        background: '#111827', border: '1px solid rgba(255,255,255,0.1)', 
-                                        borderRadius: '20px', padding: '15px', color: 'white',
-                                        boxShadow: '0 20px 40px rgba(0,0,0,0.4)'
-                                    }}
-                                />
-                                <Bar dataKey="Filled" stackId="a" fill="url(#neonGradient)" barSize={50} radius={[0, 0, 0, 0]} />
-                                <Bar dataKey="Vacant" stackId="a" fill="rgba(255,255,255,0.05)" barSize={50} radius={[10, 10, 0, 0]} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
+                    {showGraph && (
+                        <div 
+                            className="fade-in-up"
+                            style={{ 
+                                marginTop: '1.5rem',
+                                padding: '2.5rem', 
+                                background: 'rgba(255,255,255,0.01)', 
+                                borderRadius: '40px', 
+                                border: '1px solid rgba(255,255,255,0.04)',
+                                backdropFilter: 'blur(10px)'
+                            }}
+                        >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem' }}>
+                                <div>
+                                    <h2 style={{ fontSize: '1.5rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                        Domain Resilience Matrix
+                                    </h2>
+                                    <p style={{ color: darkTheme.textDim, fontSize: '0.9rem' }}>Comparative analysis of workforce deployment vs strategic capacity.</p>
+                                </div>
+                                <div style={{ display: 'flex', gap: '2rem' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: darkTheme.accent }} />
+                                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: darkTheme.textDim }}>DEPLOYED</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: 'rgba(255,255,255,0.1)' }} />
+                                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: darkTheme.textDim }}>VACANT</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style={{ width: '100%', height: 400 }}>
+                                <ResponsiveContainer>
+                                    <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 20 }}>
+                                        <defs>
+                                            <linearGradient id="neonGradient" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" stopColor={darkTheme.accent} stopOpacity={1} />
+                                                <stop offset="100%" stopColor={darkTheme.accentTertiary} stopOpacity={1} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.03)" />
+                                        <XAxis 
+                                            dataKey="name" axisLine={false} tickLine={false} 
+                                            tick={{ fill: darkTheme.textDim, fontSize: 10, fontWeight: 700 }}
+                                            interval={0} angle={-45} textAnchor="end" height={80}
+                                        />
+                                        <YAxis 
+                                            axisLine={false} tickLine={false} 
+                                            tick={{ fill: darkTheme.textDim, fontSize: 11, fontWeight: 700 }}
+                                        />
+                                        <Tooltip 
+                                            cursor={{ fill: 'rgba(255,255,255,0.03)' }}
+                                            contentStyle={{ 
+                                                background: '#111827', border: '1px solid rgba(255,255,255,0.1)', 
+                                                borderRadius: '20px', padding: '15px', color: 'white',
+                                                boxShadow: '0 20px 40px rgba(0,0,0,0.4)'
+                                            }}
+                                        />
+                                        <Bar dataKey="Filled" stackId="a" fill="url(#neonGradient)" barSize={40} radius={[0, 0, 0, 0]} />
+                                        <Bar dataKey="Vacant" stackId="a" fill="rgba(255,255,255,0.05)" barSize={40} radius={[8, 8, 0, 0]} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* ─── PROJECT DOMAIN TILES ─── */}
                 <div style={{ 
                     display: 'grid', 
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', 
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', 
                     gap: '2rem' 
                 }}>
-                    {filteredProjects.map((proj) => {
+                    {filteredProjects.map((proj, i) => {
                         const isSelected = String(proj.id) === String(selectedProjectId);
                         const isHovered = hoveredCard === proj.id;
+                        const isActiveSearch = searchQuery && (
+                            proj.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                            proj.code?.toLowerCase().includes(searchQuery.toLowerCase())
+                        );
                         
                         return (
                             <div 
@@ -282,22 +360,27 @@ const ProjectAnalyticsDashboard = () => {
                                 onMouseEnter={() => setHoveredCard(proj.id)}
                                 onMouseLeave={() => setHoveredCard(null)}
                                 onClick={() => setSelectedProjectId(isSelected ? null : proj.id)}
+                                className="fade-in-up"
                                 style={{
+                                    animationDelay: `${(i % 10) * 0.05}s`,
                                     padding: '2.5rem',
                                     background: isSelected ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.02)',
                                     borderRadius: '40px',
-                                    border: `1px solid ${isSelected ? darkTheme.accentSecondary : 'rgba(255,255,255,0.05)'}`,
+                                    border: `1px solid ${isActiveSearch ? darkTheme.accentSecondary : (isSelected ? darkTheme.accentSecondary : 'rgba(255,255,255,0.05)')}`,
                                     cursor: 'pointer',
                                     transition: 'all 0.6s cubic-bezier(0.16, 1, 0.3, 1)',
                                     transform: isHovered 
                                         ? 'translateY(-12px) scale(1.03) perspective(1000px) rotateX(2deg) rotateY(1deg)' 
                                         : 'none',
-                                    boxShadow: isHovered 
-                                        ? `0 40px 80px rgba(0,0,0,0.5), 0 0 40px ${darkTheme.accentSecondary}30` 
-                                        : '0 10px 30px rgba(0,0,0,0.1)',
+                                    boxShadow: isActiveSearch
+                                        ? `0 0 30px ${darkTheme.accentSecondary}30`
+                                        : (isHovered 
+                                            ? `0 40px 80px rgba(0,0,0,0.5), 0 0 40px ${darkTheme.accentSecondary}30` 
+                                            : '0 10px 30px rgba(0,0,0,0.1)'),
                                     position: 'relative',
                                     backdropFilter: 'blur(30px)',
-                                    overflow: 'hidden'
+                                    overflow: 'hidden',
+                                    opacity: searchQuery && !isActiveSearch ? 0.3 : 1
                                 }}
                             >
                                 {/* HYPER-MOTION SHEEN EFFECT */}
@@ -337,22 +420,25 @@ const ProjectAnalyticsDashboard = () => {
                                     </div>
                                 </div>
 
-                                <h3 style={{ fontSize: '1.8rem', fontWeight: 950, marginBottom: '0.5rem' }}>{proj.name}</h3>
+                                <h3 style={{ fontSize: '1.6rem', fontWeight: 950, marginBottom: '0.5rem' }}>
+                                    <HighlightText text={proj.name} highlight={searchQuery} />
+                                </h3>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: darkTheme.textDim, fontSize: '0.9rem', marginBottom: '3rem' }}>
-                                    <ShieldCheck size={16} color={darkTheme.accentSecondary} /> {proj.code}
+                                    <ShieldCheck size={16} color={darkTheme.accentSecondary} /> 
+                                    <HighlightText text={proj.code} highlight={searchQuery} />
                                 </div>
 
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
                                     <div>
                                         <div style={{ fontSize: '0.75rem', color: darkTheme.textDim, fontWeight: 800, textTransform: 'uppercase', marginBottom: '10px' }}>Active Personnel</div>
-                                        <div style={{ fontSize: '2rem', fontWeight: 950, display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                                            {proj.totalEmployees} <span style={{ fontSize: '0.9rem', color: darkTheme.textDim, fontWeight: 600 }}>units</span>
+                                        <div style={{ fontSize: '1.8rem', fontWeight: 950, display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                                            {proj.totalEmployees} <span style={{ fontSize: '0.8rem', color: darkTheme.textDim, fontWeight: 600 }}>units</span>
                                         </div>
                                     </div>
                                     <div>
                                         <div style={{ fontSize: '0.75rem', color: darkTheme.textDim, fontWeight: 800, textTransform: 'uppercase', marginBottom: '10px' }}>Strategic Nodes</div>
-                                        <div style={{ fontSize: '2rem', fontWeight: 950, display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                                            {proj.totalUnits} <span style={{ fontSize: '0.9rem', color: darkTheme.textDim, fontWeight: 600 }}>units</span>
+                                        <div style={{ fontSize: '1.8rem', fontWeight: 950, display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                                            {proj.totalUnits} <span style={{ fontSize: '0.8rem', color: darkTheme.textDim, fontWeight: 600 }}>units</span>
                                         </div>
                                     </div>
                                 </div>
@@ -382,97 +468,151 @@ const ProjectAnalyticsDashboard = () => {
                     <div style={{ marginTop: '5rem', animation: 'slide-up 0.6s ease-out' }}>
                         <div style={{ 
                             background: 'rgba(255,255,255,0.02)', 
-                            border: '1px solid rgba(255,255,255,0.08)',
+                            border: `1px solid ${darkTheme.accentSecondary}30`,
                             borderRadius: '50px',
-                            padding: '4rem',
-                            backdropFilter: 'blur(40px)'
+                            padding: '3rem',
+                            backdropFilter: 'blur(40px)',
+                            position: 'relative',
+                            boxShadow: `0 -50px 100px rgba(0,0,0,0.5), 0 0 40px ${darkTheme.accentSecondary}10`
                         }}>
-                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem' }}>
+                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '3rem', gap: '2rem', flexWrap: 'wrap' }}>
                                 <div>
                                     <h2 style={{ fontSize: '2.5rem', fontWeight: 950, marginBottom: '0.5rem' }}>Human Capital Manifest</h2>
-                                    <p style={{ color: darkTheme.textDim }}>Personnel resource allocation for <strong>{selectedProject.name}</strong></p>
+                                    <p style={{ color: darkTheme.textDim }}>Personnel resource allocation for <strong>{selectedProject.name}</strong> • {selectedProject.totalEmployees} employees detected</p>
                                 </div>
-                                <div style={{ 
-                                    padding: '1.5rem 2.5rem', background: 'rgba(255,255,255,0.05)', borderRadius: '24px',
-                                    display: 'flex', flexDir: 'column', alignItems: 'flex-end'
-                                }}>
-                                    <span style={{ fontSize: '0.7rem', fontWeight: 900, color: darkTheme.textDim }}>CURRENT DEPLOYMENT</span>
-                                    <span style={{ fontSize: '2rem', fontWeight: 950, color: darkTheme.accent }}>{selectedProject.totalEmployees} / {selectedProject.totalPositions}</span>
+                                
+                                <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
+                                    <div style={{ position: 'relative', minWidth: '300px' }}>
+                                        <Search style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', color: darkTheme.accentSecondary }} size={18} />
+                                        <input 
+                                            type="text" 
+                                            placeholder="Find Personnel..." 
+                                            value={employeeSearch}
+                                            onChange={(e) => setEmployeeSearch(e.target.value)}
+                                            style={{
+                                                width: '100%',
+                                                padding: '15px 15px 15px 45px',
+                                                background: 'rgba(255,255,255,0.05)',
+                                                border: '1px solid rgba(255,255,255,0.1)',
+                                                borderRadius: '16px',
+                                                color: 'white',
+                                                fontSize: '0.9rem',
+                                                outline: 'none'
+                                            }}
+                                        />
+                                    </div>
+                                    <div style={{ 
+                                        padding: '1rem 1.5rem', background: 'rgba(255,255,255,0.05)', borderRadius: '18px',
+                                        display: 'flex', flexDirection: 'column', alignItems: 'flex-end', border: '1px solid rgba(255,255,255,0.05)'
+                                    }}>
+                                        <span style={{ fontSize: '0.65rem', fontWeight: 900, color: darkTheme.textDim }}>DEPLOYMENT CAP</span>
+                                        <span style={{ fontSize: '1.5rem', fontWeight: 950, color: darkTheme.accentSecondary }}>{selectedProject.totalEmployees} / {selectedProject.totalPositions}</span>
+                                    </div>
+                                    <button onClick={() => setSelectedProjectId(null)} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: 'white', padding: '10px', borderRadius: '12px', cursor: 'pointer' }}>
+                                        <X size={24} />
+                                    </button>
                                 </div>
                              </div>
 
-                             {selectedProject.employees?.length > 0 ? (
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '1.5rem' }}>
-                                    {selectedProject.employees.map((emp, i) => (
-                                        <div key={emp.id} style={{
-                                            padding: '1.5rem',
-                                            background: 'rgba(255,255,255,0.03)',
-                                            borderRadius: '24px',
-                                            border: '1px solid rgba(255,255,255,0.05)',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '1.25rem',
-                                            transition: 'transform 0.3s ease'
-                                        }}>
-                                            <div style={{ 
-                                                width: '50px', height: '50px', borderRadius: '50%', 
-                                                background: `linear-gradient(45deg, ${darkTheme.accent}, ${darkTheme.accentSecondary})`,
-                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                fontSize: '1.1rem', fontWeight: 900, color: 'white'
-                                            }}>
-                                                {emp.name?.charAt(0)}
-                                            </div>
-                                            <div>
-                                                <div style={{ fontSize: '1.1rem', fontWeight: 800 }}>{emp.name}</div>
-                                                <div style={{ fontSize: '0.75rem', color: darkTheme.textDim, fontWeight: 600 }}>{emp.employee_code}</div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                             ) : (
-                                <div style={{ padding: '5rem', textAlign: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '30px' }}>
-                                    <Users size={64} style={{ opacity: 0.1, marginBottom: '1.5rem' }} />
-                                    <h3 style={{ fontSize: '1.5rem', fontWeight: 800 }}>No Active Personnel Detected</h3>
-                                    <p style={{ color: darkTheme.textDim }}>Current records indicate no staffing assigned to this domain.</p>
-                                </div>
-                             )}
+                             {/* SCROLLABLE MANIFEST VIEWPORT */}
+                             <div style={{ 
+                                 maxHeight: '700px', 
+                                 overflowY: 'auto', 
+                                 paddingRight: '1rem',
+                                 scrollbarWidth: 'thin',
+                                 scrollbarColor: `${darkTheme.accentSecondary}20 transparent`
+                             }}>
+                                {manifestEmployees.length > 0 ? (
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }}>
+                                        {manifestEmployees.map((emp, i) => {
+                                            const isActiveEmpSearch = employeeSearch && (
+                                                emp.name?.toLowerCase().includes(employeeSearch.toLowerCase()) || 
+                                                emp.employee_code?.toLowerCase().includes(employeeSearch.toLowerCase())
+                                            );
+
+                                            return (
+                                                <div key={emp.id} className="stagger-item" style={{
+                                                    padding: '1.25rem',
+                                                    background: 'rgba(255,255,255,0.03)',
+                                                    borderRadius: '24px',
+                                                    border: `1px solid ${isActiveEmpSearch ? darkTheme.accentSecondary : 'rgba(255,255,255,0.05)'}`,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '1.25rem',
+                                                    transition: 'all 0.3s ease',
+                                                    animation: `fade-in-up 0.5s ease-out ${Math.min(i * 0.02, 1)}s both`,
+                                                    opacity: employeeSearch && !isActiveEmpSearch ? 0.4 : 1,
+                                                    boxShadow: isActiveEmpSearch ? `0 0 15px ${darkTheme.accentSecondary}20` : 'none'
+                                                }}>
+                                                    <div style={{ 
+                                                        width: '50px', height: '50px', borderRadius: '50%', 
+                                                        background: `linear-gradient(45deg, ${darkTheme.accent}, ${darkTheme.accentSecondary})`,
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                        fontSize: '1.1rem', fontWeight: 900, color: 'white',
+                                                        boxShadow: '0 5px 15px rgba(0,0,0,0.3)'
+                                                    }}>
+                                                        {emp.name?.charAt(0)}
+                                                    </div>
+                                                    <div>
+                                                        <div style={{ fontSize: '1.05rem', fontWeight: 800 }}>
+                                                            <HighlightText text={emp.name} highlight={employeeSearch} />
+                                                        </div>
+                                                        <div style={{ fontSize: '0.75rem', color: darkTheme.textDim, fontWeight: 600 }}>
+                                                            <HighlightText text={emp.employee_code} highlight={employeeSearch} />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <div style={{ padding: '8rem', textAlign: 'center', background: 'rgba(255,255,255,0.01)', borderRadius: '30px' }}>
+                                        <Users size={64} style={{ opacity: 0.1, marginBottom: '1.5rem' }} />
+                                        <h3 style={{ fontSize: '1.5rem', fontWeight: 800 }}>No Personnel Matches</h3>
+                                        <p style={{ color: darkTheme.textDim }}>Adjust your search parameters for this domain.</p>
+                                    </div>
+                                )}
+                             </div>
                         </div>
                     </div>
                 )}
             </div>
 
             <style>{`
-                @keyframes slide-up {
-                    from { transform: translateY(50px); opacity: 0; }
+                @keyframes fade-in-up {
+                    from { transform: translateY(30px); opacity: 0; }
                     to { transform: translateY(0); opacity: 1; }
                 }
-                .glass:hover {
-                    border-color: rgba(255,255,255,0.2) !important;
-                    background: rgba(255,255,255,0.05) !important;
+                .fade-in-up {
+                    animation: fade-in-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
                 }
                 @keyframes float-gentle {
-                    0% { transform: translateY(0px); }
+                    0%, 100% { transform: translateY(0px); }
                     50% { transform: translateY(-10px); }
-                    100% { transform: translateY(0px); }
                 }
                 @keyframes sheen-glide {
                     0% { transform: translateX(-100%) skewX(-20deg); }
                     100% { transform: translateX(100%) skewX(-20deg); opacity: 0; }
                 }
                 @keyframes pulse-soft {
-                    0% { transform: scale(1); opacity: 1; }
+                    0%, 100% { transform: scale(1); opacity: 1; }
                     50% { transform: scale(1.5); opacity: 0.3; }
-                    100% { transform: scale(1); opacity: 1; }
                 }
                 .pulse-dot {
                     animation: pulse-soft 2s infinite ease-in-out;
                 }
-                .stagger-item {
-                    transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-                }
                 .stagger-item:hover {
-                    background: rgba(255,255,255,0.04) !important;
+                    background: rgba(255,255,255,0.06) !important;
+                    border-color: ${darkTheme.accentSecondary}40 !important;
+                    transform: translateX(10px);
                 }
+                ::-webkit-scrollbar { width: 6px; }
+                ::-webkit-scrollbar-track { background: transparent; }
+                ::-webkit-scrollbar-thumb { 
+                    background: ${darkTheme.accentSecondary}30; 
+                    border-radius: 10px; 
+                }
+                ::-webkit-scrollbar-thumb:hover { background: ${darkTheme.accentSecondary}50; }
             `}</style>
         </div>
     );
