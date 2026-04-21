@@ -115,6 +115,21 @@ const SearchableSelect = ({
                             value={searchTerm}
                             maxLength={30}
                             onChange={(e) => setSearchTerm(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    if (filteredOptions.length > 0) {
+                                        handleSelect(filteredOptions[0]);
+                                    } else {
+                                        setIsOpen(false);
+                                    }
+                                } else if (e.key === 'Escape') {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setIsOpen(false);
+                                }
+                            }}
                             style={{
                                 width: '100%',
                                 padding: '8px 12px 8px 32px',
