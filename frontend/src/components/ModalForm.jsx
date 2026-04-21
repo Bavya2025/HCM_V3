@@ -2078,25 +2078,55 @@ const ModalForm = () => {
                                 <label className="premium-label"><Network size={14} /> Section Code (Manual)</label>
                                 <div className="premium-input-wrapper">
                                     <Network className="premium-input-icon" size={18} />
-                                    <input type="text" className="premium-input" placeholder="Enter Section Code" value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 50, 'sec_code') })} required />
+                                    <input 
+                                        type="text" 
+                                        className="premium-input" 
+                                        placeholder="Enter Section Code" 
+                                        value={formData.code || ''} 
+                                        onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 50, 'sec_code') })} 
+                                        maxLength={50}
+                                        required 
+                                    />
                                 </div>
-                                {validationErrors.sec_code && (
-                                    <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                        <X size={12} /> {validationErrors.sec_code}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+                                    <div>
+                                        {validationErrors.sec_code && (
+                                            <div style={{ color: '#ef4444', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                <X size={12} /> {validationErrors.sec_code}
+                                            </div>
+                                        )}
                                     </div>
-                                )}
+                                    <div style={{ fontSize: '0.7rem', color: (formData.code?.length || 0) >= 45 ? 'var(--primary)' : '#94a3b8', fontWeight: 600 }}>
+                                        {formData.code?.length || 0} / 50
+                                    </div>
+                                </div>
                             </div>
                             <div className="form-group">
                                 <label className="premium-label"><Edit size={14} /> Section Name</label>
                                 <div className="premium-input-wrapper">
                                     <Edit className="premium-input-icon" size={18} />
-                                    <input type="text" className="premium-input" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value, 50, 'sec_name') })} required />
+                                    <input 
+                                        type="text" 
+                                        className="premium-input" 
+                                        placeholder="Enter Section Name"
+                                        value={formData.name || ''} 
+                                        onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value, 50, 'sec_name') })} 
+                                        maxLength={50}
+                                        required 
+                                    />
                                 </div>
-                                {validationErrors.sec_name && (
-                                    <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                        <X size={12} /> {validationErrors.sec_name}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+                                    <div>
+                                        {validationErrors.sec_name && (
+                                            <div style={{ color: '#ef4444', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                <X size={12} /> {validationErrors.sec_name}
+                                            </div>
+                                        )}
                                     </div>
-                                )}
+                                    <div style={{ fontSize: '0.7rem', color: (formData.name?.length || 0) >= 45 ? 'var(--primary)' : '#94a3b8', fontWeight: 600 }}>
+                                        {formData.name?.length || 0} / 50
+                                    </div>
+                                </div>
                             </div>
                             <div className="form-group full-width">
                                 <label className="premium-label"><Calendar size={14} /> Start Date <span style={{ color: '#ef4444' }}>*</span></label>
