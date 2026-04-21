@@ -1371,6 +1371,17 @@ export const DataProvider = ({ children }) => {
             // General Hydration: Convert object values and arrays of objects to IDs where appropriate
             const hydratedItem = { ...item };
 
+            // SECURITY/CONTEXT FIX: Map backend IDs to frontend field names for dropdown context
+            if (hydratedItem.job_family_id && !hydratedItem.job_family) {
+                hydratedItem.job_family = hydratedItem.job_family_id;
+            }
+            if (hydratedItem.role_type_id && !hydratedItem.role_type) {
+                hydratedItem.role_type = hydratedItem.role_type_id;
+            }
+            if (hydratedItem.role_id && !hydratedItem.role) {
+                hydratedItem.role = hydratedItem.role_id;
+            }
+
             // Special handling for Clusters to derive UI-only state (urban_type/rural_type)
             if (type === 'Clusters') {
                 if (item.mandal_name) {
