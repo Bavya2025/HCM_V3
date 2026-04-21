@@ -2847,10 +2847,23 @@ const ModalForm = () => {
                         <div className="form-section-title" style={{ marginBottom: '2rem' }}><ClipboardList size={18} /> Task Details</div>
                         <div className="form-grid">
                             <div className="form-group">
-                                <label className="premium-label"><Network size={14} /> Task Code (Manual) <span style={{ color: '#ef4444' }}>*</span></label>
+                                <label className="premium-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span><Network size={14} /> Task Code (Manual) <span style={{ color: '#ef4444' }}>*</span></span>
+                                    <span style={{ fontSize: '0.7rem', color: (formData.code?.length || 0) >= 40 ? 'var(--magenta)' : '#94a3b8' }}>
+                                        {formData.code?.length || 0}/50
+                                    </span>
+                                </label>
                                 <div className="premium-input-wrapper">
                                     <Network className="premium-input-icon" size={18} />
-                                    <input type="text" className="premium-input" placeholder="Enter Task Code" value={formData.code || ''} onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 50, 'task_code') })} required />
+                                    <input 
+                                        type="text" 
+                                        className="premium-input" 
+                                        placeholder="Enter Task Code" 
+                                        value={formData.code || ''} 
+                                        maxLength={50}
+                                        onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 50, 'task_code') })} 
+                                        required 
+                                    />
                                 </div>
                                 {validationErrors.task_code && (
                                     <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -2875,16 +2888,29 @@ const ModalForm = () => {
                                 </div>
                             </div>
                             <div className="form-group full-width">
-                                <label className="premium-label"><Edit size={14} /> Task Name <span style={{ color: '#ef4444' }}>*</span></label>
-                                <div className="premium-input-wrapper">
-                                    <Edit className="premium-input-icon" size={18} />
-                                    <input type="text" className="premium-input" placeholder="Enter Task Name" value={formData.name || ''} onChange={(e) => setFormData({ ...formData, name: validateAlphaNumeric(e.target.value, 50, 'task_name') })} required />
-                                </div>
-                                {validationErrors.task_name && (
-                                    <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                        <X size={12} /> {validationErrors.task_name}
-                                    </div>
-                                )}
+                                <label className="premium-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                     <span><Edit size={14} /> Task Name <span style={{ color: '#ef4444' }}>*</span></span>
+                                     <span style={{ fontSize: '0.7rem', color: (formData.name?.length || 0) >= 40 ? 'var(--magenta)' : '#94a3b8' }}>
+                                         {formData.name?.length || 0}/50
+                                     </span>
+                                 </label>
+                                 <div className="premium-input-wrapper">
+                                     <Edit className="premium-input-icon" size={18} />
+                                     <input 
+                                         type="text" 
+                                         className="premium-input" 
+                                         placeholder="Enter Task Name" 
+                                         value={formData.name || ''} 
+                                         maxLength={50}
+                                         onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value, 50, 'task_name') })} 
+                                         required 
+                                     />
+                                 </div>
+                                 {validationErrors.task_name && (
+                                     <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                         <X size={12} /> {validationErrors.task_name}
+                                     </div>
+                                 )}
                             </div>
                             <div className="form-group full-width">
                                 <label className="premium-label"><Calendar size={14} /> Start Date <span style={{ color: '#ef4444' }}>*</span></label>
