@@ -2452,6 +2452,23 @@ const ModalForm = () => {
                             </div>
 
                             <div className="form-group full-width">
+                                <label className="premium-label"><ShieldCheck size={14} /> Account Status</label>
+                                <div className="premium-input-wrapper">
+                                    <SearchableSelect
+                                        options={[
+                                            { id: true, name: 'Active' },
+                                            { id: false, name: 'Inactive' }
+                                        ]}
+                                        value={formData.is_active !== undefined ? formData.is_active : true}
+                                        onChange={(e) => setFormData({ ...formData, is_active: e.target.value === 'true' || e.target.value === true })}
+                                        placeholder="Select Status..."
+                                        icon={ShieldCheck}
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-group full-width">
                                 <label className="premium-label"><FileText size={14} /> Description</label>
                                 <div className="premium-input-wrapper" style={{ height: 'auto' }}>
                                     <FileText className="premium-input-icon" size={18} style={{ marginTop: '0.75rem' }} />
