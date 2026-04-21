@@ -1424,7 +1424,6 @@ class LandmarkViewSet(ScopedViewSetMixin, viewsets.ModelViewSet):
 class OrganizationLevelViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelViewSet):
     queryset = OrganizationLevel.objects.all()
     serializer_class = OrganizationLevelSerializer
-    upsert_lookup_fields = ['name']
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['name']
     ordering = ['rank']
@@ -1438,7 +1437,6 @@ class OrganizationLevelViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.
 class OfficeViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelViewSet):
     queryset = Office.objects.all()
     serializer_class = OfficeSerializer
-    upsert_lookup_fields = ['name']
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['name', 'code', 'registered_name', 'country_name', 'state_name', 'district_name', 'mandal_name', 'address', 'location']
     ordering_fields = ['name', 'level__rank']
@@ -2113,7 +2111,6 @@ class TaskViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelViewSet)
 class PositionLevelViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelViewSet):
     queryset = PositionLevel.objects.all()
     serializer_class = PositionLevelSerializer
-    upsert_lookup_fields = ['name']
     pagination_class = None
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
@@ -2879,7 +2876,6 @@ class IndianVillageViewSet(ScopedViewSetMixin, viewsets.ModelViewSet):
 class DocumentTypeViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelViewSet):
     queryset = DocumentType.objects.all()
     serializer_class = DocumentTypeSerializer
-    upsert_lookup_fields = ['name']
 
 class EmployeeDocumentViewSet(ScopedViewSetMixin, viewsets.ModelViewSet):
     queryset = EmployeeDocument.objects.all()
