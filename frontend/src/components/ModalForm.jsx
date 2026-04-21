@@ -1712,7 +1712,10 @@ const ModalForm = () => {
                                                     return (geoDistrictsData || []).filter(d => d && d.state == selectedStateId).map(d => ({ id: d.name, name: d.name }));
                                                 })()}
                                                 value={formData.district_name || ''}
-                                                onChange={(e) => setFormData({ ...formData, district_name: e.target.value, mandal_name: '', location: '' })}
+                                                onChange={(e) => {
+                                                    securedUpdate('district_name', e.target.value, ['state_name']);
+                                                    setFormData(prev => ({ ...prev, mandal_name: '', location: '' }));
+                                                }}
                                                 placeholder="Select District..."
                                                 icon={MapPin}
                                                 required={!['L1', 'L2'].includes(currentLevel?.level_code)}
@@ -1737,8 +1740,9 @@ const ModalForm = () => {
                                                 value={formData.mandal_name || ''}
                                                 onChange={(e) => {
                                                     const val = e.target.value;
-                                                    setFormData({ ...formData, mandal_name: val, cluster: '', location: '' });
-                                                    if (val) checkGeoMandal(val, formData.district_name, formData.state_name);
+                                                    securedUpdate('mandal_name', val, ['district_name']);
+                                                    setFormData(prev => ({ ...prev, cluster: '', location: '' }));
+                                                    if (val && formData.district_name) checkGeoMandal(val, formData.district_name, formData.state_name);
                                                 }}
                                                 placeholder="Select Mandal..."
                                                 icon={Navigation}
@@ -2072,12 +2076,15 @@ const ModalForm = () => {
                                         options={departments.filter(d => d.office == formData.office).map(d => ({ id: d.id, name: d.name }))}
                                         value={formData.department || ''}
                                         onChange={(e) => {
-                                            const dept = departments.find(d => d.id == e.target.value);
-                                            setFormData({
-                                                ...formData,
-                                                department: e.target.value,
-                                                project: dept?.project || null
-                                            });
+                                            const val = e.target.value;
+                                            const dept = departments.find(d => d.id == val);
+                                            securedUpdate('department', val, ['office']);
+                                            if (formData.office) {
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    project: dept?.project || null
+                                                }));
+                                            }
                                         }}
                                         placeholder="Select Department..."
                                         icon={Briefcase}
