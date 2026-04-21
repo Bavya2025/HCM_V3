@@ -1970,7 +1970,6 @@ class SectionViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelViewS
 class JobFamilyViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelViewSet):
     queryset = JobFamily.objects.all()
     serializer_class = JobFamilySerializer
-    upsert_lookup_fields = ['name']
     pagination_class = None
 
     def get_queryset(self):
