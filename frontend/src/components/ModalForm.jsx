@@ -113,6 +113,25 @@ const ModalForm = () => {
         }, 2000); // Clear after 2 seconds
     };
 
+    // SECURITY: Hardened state updater that prevents tampered updates to locked/disabled fields
+    const securedUpdate = (field, value, dependencies = []) => {
+        // 1. Check if the field is explicitly locked by Project Scope
+        if (isFieldLocked(field)) {
+            console.warn(`Tamper Detection: Update to locked field '${field}' blocked.`);
+            return;
+        }
+
+        // 2. Check if a mandatory dependency is missing (e.g. Mandal before District)
+        const missingDependency = dependencies.find(dep => !formData[dep]);
+        if (missingDependency) {
+            console.warn(`Tamper Detection: Update to field '${field}' blocked due to missing dependency '${missingDependency}'.`);
+            return;
+        }
+
+        // 3. Apply the update if all checks pass
+        setFormData(prev => ({ ...prev, [field]: value }));
+    };
+
     // Helper to determine if a field is locked by Project Scope
     const isFieldLocked = (field) => {
         if (!selectedProj || currentLevel?.level_code !== 'L9') return false;
@@ -2801,7 +2820,10 @@ const ModalForm = () => {
                                         options={(roleTypes || []).filter(rt => rt.job_family == formData.job_family).map(rt => ({ id: rt.id, name: rt.name }))}
                                         value={formData.role_type || ''}
                                         disabled={!formData.job_family}
-                                        onChange={(e) => setFormData({ ...formData, role_type: e.target.value, role: '', job: '' })}
+                                        onChange={(e) => {
+                                            securedUpdate('role_type', e.target.value, ['job_family']);
+                                            setFormData(prev => ({ ...prev, role: '', job: '' }));
+                                        }}
                                         placeholder="Select Role Type..."
                                         icon={Layers}
                                         required
@@ -2815,7 +2837,10 @@ const ModalForm = () => {
                                         options={(roles || []).filter(r => r.role_type == formData.role_type).map(r => ({ id: r.id, name: r.name }))}
                                         value={formData.role || ''}
                                         disabled={!formData.role_type}
-                                        onChange={(e) => setFormData({ ...formData, role: e.target.value, job: '' })}
+                                        onChange={(e) => {
+                                            securedUpdate('role', e.target.value, ['role_type']);
+                                            setFormData(prev => ({ ...prev, job: '' }));
+                                        }}
                                         placeholder="Select Role..."
                                         icon={UserSquare2}
                                         required
@@ -2831,8 +2856,11 @@ const ModalForm = () => {
                                         disabled={!formData.role}
                                         onChange={(e) => {
                                             const jId = e.target.value;
-                                            const nextCode = generateNextCode('TK', tasks, 'job', jId);
-                                            setFormData({ ...formData, job: jId, code: nextCode });
+                                            if (formData.role) {
+                                                const nextCode = generateNextCode('TK', tasks, 'job', jId);
+                                                securedUpdate('job', jId, ['role']);
+                                                setFormData(prev => ({ ...prev, code: nextCode }));
+                                            }
                                         }}
                                         placeholder="Select Job..."
                                         icon={ClipboardList}

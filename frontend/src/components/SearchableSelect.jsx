@@ -43,7 +43,10 @@ const SearchableSelect = ({
     });
 
     const handleSelect = (option) => {
-        if (disabled) return;
+        if (disabled) {
+            console.warn("Security: Attempted to select value in a disabled dropdown. Action blocked.");
+            return;
+        }
         onChange({ target: { value: option.id || option.value } });
         setIsOpen(false);
         setSearchTerm('');
