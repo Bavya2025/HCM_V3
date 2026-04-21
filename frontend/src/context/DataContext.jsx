@@ -561,6 +561,13 @@ export const DataProvider = ({ children }) => {
         sessionStorage.removeItem('authToken');
         sessionStorage.removeItem('loginHitId');
 
+        // SECURITY: Clear all cached filter states and session-bound persistence
+        Object.keys(sessionStorage).forEach(key => {
+            if (key.startsWith('filters_') || key.startsWith('last_fetch_')) {
+                sessionStorage.removeItem(key);
+            }
+        });
+
         // Clear User State
         setIsAuthenticated(false);
         setUser(null);

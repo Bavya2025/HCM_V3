@@ -43,6 +43,7 @@ const SearchableSelect = ({
     });
 
     const handleSelect = (option) => {
+        if (disabled) return;
         onChange({ target: { value: option.id || option.value } });
         setIsOpen(false);
         setSearchTerm('');
