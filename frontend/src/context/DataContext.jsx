@@ -358,7 +358,7 @@ export const DataProvider = ({ children }) => {
                         const item = data.find(i => String(i.id) === String(itemId));
                         if (item) {
                             setModalType(section.name);
-                            setFormData({ ...item });
+                            setFormData(hydrateItem(section.name, item));
                             setShowModal(true);
                         } else if (data.length > 0) {
                             navigate(`/${path}`);
@@ -1322,30 +1322,22 @@ export const DataProvider = ({ children }) => {
         setShowModal(true);
 
         // Update URL to reflect "Add"
+        // Update URL to reflect "Add"
         const section = SECTIONS.find(s => s.name === type);
         if (section && (!showEmployeeProfile || type === 'Employees')) {
             navigate(`/${section.id}/add`);
         }
     };
 
-    const handleEdit = (type, item) => {
-        // Allow self-profile editing regardless of general permissions
-        const isSelfProfileEdit = type === 'Employees' && item._is_profile_edit === true;
-
-        if (!isSelfProfileEdit && !canEdit(type)) {
-            showNotification(`You do not have permission to edit this ${type}`, 'error');
-            return;
-        }
-        setModalType(type);
+    const hydrateItem = (type, item) => {
         if (type === 'Task URL Mapping') {
             // Find all existing mappings for this task to populate the bulk wizard
-            // Ensure data is an array before filtering to avoid crashes
             const safeData = Array.isArray(data) ? data : [];
             const relatedMappings = safeData.filter(m => m && m.task === item.task);
-            setFormData({
+            return {
                 ...item,
                 _bulk_items: relatedMappings
-            });
+            };
         } else if (type === 'Employees') {
             // Special handling for employees: extract position IDs
             let positionIds = item.positions || [];
@@ -1363,11 +1355,11 @@ export const DataProvider = ({ children }) => {
                 assignmentFilters._emp_section_filter = primaryPos.section_id || '';
             }
 
-            setFormData({
+            return {
                 ...item,
                 positions: positionIds,
                 ...assignmentFilters
-            });
+            };
         } else {
             // General Hydration: Convert object values and arrays of objects to IDs where appropriate
             const hydratedItem = { ...item };
@@ -1396,8 +1388,20 @@ export const DataProvider = ({ children }) => {
                     hydratedItem[key] = val.map(obj => obj.id);
                 }
             });
-            setFormData(hydratedItem);
+            return hydratedItem;
         }
+    };
+
+    const handleEdit = (type, item) => {
+        // Allow self-profile editing regardless of general permissions
+        const isSelfProfileEdit = type === 'Employees' && item._is_profile_edit === true;
+
+        if (!isSelfProfileEdit && !canEdit(type)) {
+            showNotification(`You do not have permission to edit this ${type}`, 'error');
+            return;
+        }
+        setModalType(type);
+        setFormData(hydrateItem(type, item));
         setShowModal(true);
 
         // Update URL to reflect "Edit" with MASKED ID

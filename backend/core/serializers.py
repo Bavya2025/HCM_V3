@@ -156,6 +156,8 @@ class GeoClusterSerializer(serializers.ModelSerializer):
     country_id = serializers.ReadOnlyField(source='mandal.district.state.country.id')
     continent_id = serializers.ReadOnlyField(source='mandal.district.state.country.continent_ref.id')
 
+    code = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
     class Meta:
         model = GeoCluster
         fields = [
