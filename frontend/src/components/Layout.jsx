@@ -29,7 +29,8 @@ const Layout = ({ children }) => {
         notification,
         isSidebarOpen,
         toggleSidebar,
-        isSubmitting
+        isSubmitting,
+        validationErrors
     } = useData();
 
     return (
@@ -123,8 +124,14 @@ const Layout = ({ children }) => {
                                     <button
                                         type="submit"
                                         className="btn-primary"
-                                        style={{ flex: 1, justifyContent: 'center', opacity: isSubmitting ? 0.7 : 1, cursor: isSubmitting ? 'wait' : 'pointer' }}
-                                        disabled={isSubmitting}
+                                        style={{ 
+                                            flex: 1, 
+                                            justifyContent: 'center', 
+                                            opacity: (isSubmitting || Object.keys(validationErrors || {}).length > 0) ? 0.6 : 1, 
+                                            cursor: isSubmitting ? 'wait' : (Object.keys(validationErrors || {}).length > 0 ? 'not-allowed' : 'pointer'),
+                                            filter: Object.keys(validationErrors || {}).length > 0 ? 'grayscale(1)' : 'none'
+                                        }}
+                                        disabled={isSubmitting || Object.keys(validationErrors || {}).length > 0}
                                     >
                                         {isSubmitting ? (
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

@@ -245,6 +245,7 @@ export const DataProvider = ({ children }) => {
     const [activeProfileTab, setActiveProfileTab] = useState('Employment');
     const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1024);
     const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
+    const [validationErrors, setValidationErrors] = useState({});
     const [previousModal, setPreviousModal] = useState(null);
     const [orgTab, setOrgTab] = useState('structure');
     const [expandedGroups, setExpandedGroups] = useState(['Organization']);
@@ -1298,6 +1299,7 @@ export const DataProvider = ({ children }) => {
             showNotification(`You do not have permission to add ${type}`, 'error');
             return;
         }
+        setValidationErrors({}); // RESET validation errors on add
         if (showModal) {
             setPreviousModal({ type: modalType, data: { ...formData } });
         } else {
@@ -1418,6 +1420,7 @@ export const DataProvider = ({ children }) => {
             showNotification(`You do not have permission to edit this ${type}`, 'error');
             return;
         }
+        setValidationErrors({}); // RESET validation errors on edit
         setModalType(type);
         setFormData(hydrateItem(type, item));
         setShowModal(true);
@@ -1577,6 +1580,7 @@ export const DataProvider = ({ children }) => {
             setShowModal(false);
             setModalType('');
             setFormData({});
+            setValidationErrors({}); // RESET validation errors on close
 
             // Reset URL - Go back to base section if we were in add/edit
             const parts = location.pathname.split('/');
@@ -1941,6 +1945,7 @@ export const DataProvider = ({ children }) => {
         geoVisitingLocations, setGeoVisitingLocations,
         geoLandmarks, setGeoLandmarks,
         notification, setNotification,
+        validationErrors, setValidationErrors,
         previousModal, setPreviousModal,
         orgTab, setOrgTab,
         isAuthenticated, login, logout, user, error, refreshPermissions,

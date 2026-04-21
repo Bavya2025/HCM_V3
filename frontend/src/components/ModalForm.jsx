@@ -84,16 +84,12 @@ const ModalForm = () => {
         geoClusters,
         handleAdd,
         positionLevels,
-        user
+        user,
+        validationErrors,
+        setValidationErrors
     } = useData();
 
-    // State for validation errors
-    const [validationErrors, setValidationErrors] = React.useState({});
-    const [officeSearchTerm, setOfficeSearchTerm] = React.useState('');
-
-
-
-    // Derived values for easy access in forms
+    // Reset URL to reflect "Edit" with MASKED ID
     const selectedMaster = facilityMasters?.find(m => String(m.id) === String(formData.facility_master));
     const selectedProj = projects?.find(p => {
         if (formData.project) return String(p.id) === String(formData.project);
@@ -285,10 +281,41 @@ const ModalForm = () => {
         if (filtered !== value && fieldName) {
             showValidationError(fieldName, 'Only numbers allowed');
         }
+
+        // BLOCK: Dummy values like 0000000000 or invalid start digits
+        if (filtered.length === 10) {
+            if (/^0+$/.test(filtered)) {
+                showValidationError(fieldName, 'Invalid number (cannot be all zeros)');
+            } else if (!/^[6-9]/.test(filtered)) {
+                showValidationError(fieldName, 'Mobile number MUST start with 6, 7, 8 or 9');
+            }
+        }
+
         if (filtered.length >= 10 && value.length > 10 && fieldName) {
             showValidationError(fieldName, 'Maximum 10 digits allowed');
         }
         return filtered.slice(0, 10);
+    };
+
+    const validateEmail = (value, maxLength = 50, fieldName = '') => {
+        // Combined logic: Max length + Suffix protection
+        let cleaned = value.replace(/[^A-Za-z0-9@._-]/g, '');
+        const originalLengthBeforeSuffix = cleaned.length;
+
+        // Domain suffix protection (prevent junk after .com/in)
+        cleaned = cleaned.replace(/\.com[^.]*$/i, '.com').replace(/\.in[^.]*$/i, '.in');
+
+        if (cleaned.length < originalLengthBeforeSuffix && fieldName) {
+            showValidationError(fieldName, 'Cannot add characters after .com or .in');
+        } else if (cleaned !== value && cleaned.length === originalLengthBeforeSuffix && fieldName) {
+            showValidationError(fieldName, 'Invalid characters in email');
+        }
+
+        if (cleaned.length > maxLength && fieldName) {
+            showValidationError(fieldName, `Email limit reached (${maxLength} chars)`);
+        }
+
+        return cleaned.slice(0, maxLength);
     };
 
     const generateNextCode = (prefix, collection, parentIdField = null, parentId = null) => {
@@ -371,23 +398,6 @@ const ModalForm = () => {
         return capitalize(filtered).slice(0, maxLength);
     };
 
-    const validateEmailStrict = (value, fieldName = '') => {
-        // Restrict to common patterns ending in .com or .in
-        let cleaned = value.replace(/[^A-Za-z0-9@._-]/g, '');
-        const originalLength = cleaned.length;
-
-        // Prevent typing characters after .com or .in
-        cleaned = cleaned.replace(/\.com[^.]*$/i, '.com').replace(/\.in[^.]*$/i, '.in');
-
-        if (cleaned.length < originalLength && fieldName) {
-            showValidationError(fieldName, 'Cannot add characters after .com or .in');
-        } else if (cleaned !== value && cleaned.length === originalLength && fieldName) {
-            showValidationError(fieldName, 'Invalid characters in email');
-        }
-
-        return cleaned.toLowerCase();
-    };
-
     const isEmailValid = (email) => {
         const re = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.(com|in)$/;
         return re.test(String(email).toLowerCase());
@@ -399,14 +409,6 @@ const ModalForm = () => {
         setFormData(prev => ({ ...prev, name: newName }));
     };
 
-    const validateEmail = (value, maxLength = 100, fieldName = '') => {
-        // Allow standard email characters
-        const filtered = value.replace(/[^A-Za-z0-9@._-]/g, '');
-        if (filtered !== value && fieldName) {
-            showValidationError(fieldName, 'Invalid characters in email');
-        }
-        return filtered.slice(0, maxLength);
-    };
 
     // Reload task URL mappings when editing to get latest permissions
     React.useEffect(() => {
@@ -3151,7 +3153,7 @@ const ModalForm = () => {
                                         value={formData.phone || ''}
                                         onChange={(e) => {
                                             const ph = validatePhone(e.target.value, 'employee_phone');
-                                            setFormData({ ...formData, phone: ph });
+                                            setFormData(prev => ({ ...prev, phone: ph }));
                                             if (ph && ph.length === 10 && allEmployees.some(emp => String(emp.phone) === String(ph) && String(emp.id) !== String(formData.id))) {
                                                 showValidationError('employee_phone', 'This phone number is already registered');
                                             }
@@ -3175,8 +3177,8 @@ const ModalForm = () => {
                                         placeholder="Enter Login Email (e.g. user@gmail.com)"
                                         value={formData.email || ''}
                                         onChange={(e) => {
-                                            const emailVal = validateEmailStrict(e.target.value, 'email');
-                                            setFormData({ ...formData, email: emailVal });
+                                            const emailVal = validateEmail(e.target.value, 50, 'email');
+                                            setFormData(prev => ({ ...prev, email: emailVal }));
                                             if (emailVal && allEmployees.some(emp => String(emp.email).toLowerCase() === emailVal.toLowerCase() && String(emp.id) !== String(formData.id))) {
                                                 showValidationError('email', 'This email already belongs to another account');
                                             }
@@ -3189,6 +3191,9 @@ const ModalForm = () => {
                                         ⚠ {validationErrors.email}
                                     </div>
                                 )}
+                                <div style={{ textAlign: 'right', fontSize: '0.65rem', color: (formData.email?.length >= 50) ? '#be185d' : '#94a3b8', marginTop: '4px', fontWeight: 600 }}>
+                                    {formData.email?.length || 0} / 50 characters used
+                                </div>
                                 {formData.email && !isEmailValid(formData.email) && (
                                     <div style={{ color: '#ef4444', fontSize: '0.7rem', marginTop: '4px', marginLeft: '3rem' }}>
                                         ⚠ Email must end with @.com or .in
