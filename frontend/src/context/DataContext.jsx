@@ -1478,7 +1478,7 @@ export const DataProvider = ({ children }) => {
 
             // Parallel refresh to ensure dashboard reflects changes ASAP
             await Promise.all([
-                fetchData(true, true, 1, currentFilters, true),
+                fetchData(true, true, pagination.current || 1, currentFilters, true),
                 fetchStats(true, true),
                 fetchDropdownData(null, null, true)
             ]);
@@ -1691,7 +1691,7 @@ export const DataProvider = ({ children }) => {
                 }
 
                 const refreshTasks = [
-                    fetchData(true, true, 1, currentFilters, true), // Refresh with current filters and FORCE
+                    fetchData(true, true, formData.id ? (pagination.current || 1) : 1, currentFilters, true), // Page pagination.current for edits, Page 1 for adds
                     fetchStats(true, true),
                     fetchDropdownData(endpoint, null, true) // Force refresh for specific endpoint
                 ];
