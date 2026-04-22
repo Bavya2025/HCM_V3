@@ -404,6 +404,28 @@ const ModalForm = () => {
     };
 
 
+    const renderCharacterCounter = (currentValue, maxLength) => {
+        if (!maxLength) return null;
+        const currentLength = String(currentValue || '').length;
+        const remaining = maxLength - currentLength;
+        const isLimitReached = remaining <= 0;
+        const isNearLimit = remaining <= (maxLength * 0.1) || remaining <= 5;
+
+        return (
+            <div style={{
+                textAlign: 'right',
+                fontSize: '0.65rem',
+                color: isLimitReached ? '#be185d' : (isNearLimit ? '#db2777' : '#94a3b8'),
+                marginTop: '2px',
+                fontWeight: 600,
+                opacity: currentLength > 0 ? 1 : 0.4,
+                transition: 'all 0.2s ease'
+            }}>
+                {currentLength} / {maxLength}
+            </div>
+        );
+    };
+
     const handleClusterNameChange = (val) => {
         const newName = validateName(val, 50, 'geo_name');
         setFormData(prev => ({ ...prev, name: newName }));
@@ -2106,14 +2128,14 @@ const ModalForm = () => {
                                 <label className="premium-label"><Network size={14} /> Section Code (Manual)</label>
                                 <div className="premium-input-wrapper">
                                     <Network className="premium-input-icon" size={18} />
-                                    <input 
-                                        type="text" 
-                                        className="premium-input" 
-                                        placeholder="Enter Section Code" 
-                                        value={formData.code || ''} 
-                                        onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 50, 'sec_code') })} 
+                                    <input
+                                        type="text"
+                                        className="premium-input"
+                                        placeholder="Enter Section Code"
+                                        value={formData.code || ''}
+                                        onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 50, 'sec_code') })}
                                         maxLength={50}
-                                        required 
+                                        required
                                     />
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
@@ -2133,14 +2155,14 @@ const ModalForm = () => {
                                 <label className="premium-label"><Edit size={14} /> Section Name</label>
                                 <div className="premium-input-wrapper">
                                     <Edit className="premium-input-icon" size={18} />
-                                    <input 
-                                        type="text" 
-                                        className="premium-input" 
+                                    <input
+                                        type="text"
+                                        className="premium-input"
                                         placeholder="Enter Section Name"
-                                        value={formData.name || ''} 
-                                        onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value, 50, 'sec_name') })} 
+                                        value={formData.name || ''}
+                                        onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value, 50, 'sec_name') })}
                                         maxLength={50}
-                                        required 
+                                        required
                                     />
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
@@ -2892,14 +2914,14 @@ const ModalForm = () => {
                                 </label>
                                 <div className="premium-input-wrapper">
                                     <Network className="premium-input-icon" size={18} />
-                                    <input 
-                                        type="text" 
-                                        className="premium-input" 
-                                        placeholder="Enter Task Code" 
-                                        value={formData.code || ''} 
+                                    <input
+                                        type="text"
+                                        className="premium-input"
+                                        placeholder="Enter Task Code"
+                                        value={formData.code || ''}
                                         maxLength={50}
-                                        onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 50, 'task_code') })} 
-                                        required 
+                                        onChange={(e) => setFormData({ ...formData, code: validateCode(e.target.value, 50, 'task_code') })}
+                                        required
                                     />
                                 </div>
                                 {validationErrors.task_code && (
@@ -2926,28 +2948,28 @@ const ModalForm = () => {
                             </div>
                             <div className="form-group full-width">
                                 <label className="premium-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                     <span><Edit size={14} /> Task Name <span style={{ color: '#ef4444' }}>*</span></span>
-                                     <span style={{ fontSize: '0.7rem', color: (formData.name?.length || 0) >= 40 ? 'var(--magenta)' : '#94a3b8' }}>
-                                         {formData.name?.length || 0}/50
-                                     </span>
-                                 </label>
-                                 <div className="premium-input-wrapper">
-                                     <Edit className="premium-input-icon" size={18} />
-                                     <input 
-                                         type="text" 
-                                         className="premium-input" 
-                                         placeholder="Enter Task Name" 
-                                         value={formData.name || ''} 
-                                         maxLength={50}
-                                         onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value, 50, 'task_name') })} 
-                                         required 
-                                     />
-                                 </div>
-                                 {validationErrors.task_name && (
-                                     <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                         <X size={12} /> {validationErrors.task_name}
-                                     </div>
-                                 )}
+                                    <span><Edit size={14} /> Task Name <span style={{ color: '#ef4444' }}>*</span></span>
+                                    <span style={{ fontSize: '0.7rem', color: (formData.name?.length || 0) >= 40 ? 'var(--magenta)' : '#94a3b8' }}>
+                                        {formData.name?.length || 0}/50
+                                    </span>
+                                </label>
+                                <div className="premium-input-wrapper">
+                                    <Edit className="premium-input-icon" size={18} />
+                                    <input
+                                        type="text"
+                                        className="premium-input"
+                                        placeholder="Enter Task Name"
+                                        value={formData.name || ''}
+                                        maxLength={50}
+                                        onChange={(e) => setFormData({ ...formData, name: validateName(e.target.value, 50, 'task_name') })}
+                                        required
+                                    />
+                                </div>
+                                {validationErrors.task_name && (
+                                    <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <X size={12} /> {validationErrors.task_name}
+                                    </div>
+                                )}
                             </div>
                             <div className="form-group full-width">
                                 <label className="premium-label"><Calendar size={14} /> Start Date <span style={{ color: '#ef4444' }}>*</span></label>
@@ -3869,8 +3891,11 @@ const ModalForm = () => {
                                         options={orgLevels?.map(lvl => ({ id: lvl.id, name: `${lvl.name} (${lvl.level_code})` })) || []}
                                         value={formData.assigned_level || ''}
                                         onChange={(e) => {
-                                            setFormData({ ...formData, assigned_level: e.target.value || null, assigned_offices: [] });
-                                            setOfficeSearchTerm('');
+                                            const newVal = e.target.value || null;
+                                            if (String(newVal) !== String(formData.assigned_level || null)) {
+                                                setFormData({ ...formData, assigned_level: newVal, assigned_offices: [] });
+                                                setOfficeSearchTerm('');
+                                            }
                                         }}
                                         placeholder="Corporate / Global Scope"
                                         icon={Layers}
@@ -3879,93 +3904,137 @@ const ModalForm = () => {
                             </div>
 
                             <div className="form-group full-width">
-                                <label className="premium-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <label className="premium-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                                     <span><Building2 size={14} /> Assigned Offices (Checklist)</span>
-                                    {formData.assigned_level && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                        {formData.assigned_level && (
+                                            <div style={{ display: 'flex', gap: '6px' }}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const allFilteredIds = filteredOffices.map(o => String(o.id));
+                                                        const current = (formData.assigned_offices || []).map(String);
+                                                        const next = Array.from(new Set([...current, ...allFilteredIds]));
+                                                        setFormData({ ...formData, assigned_offices: next });
+                                                    }}
+                                                    style={{ fontSize: '0.7rem', padding: '4px 10px', borderRadius: '8px', background: '#fb923c', color: 'white', border: 'none', fontWeight: 700, cursor: 'pointer' }}
+                                                >
+                                                    Select All
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const allFilteredIds = filteredOffices.map(o => String(o.id));
+                                                        const current = (formData.assigned_offices || []).map(String);
+                                                        const next = current.filter(id => !allFilteredIds.includes(id));
+                                                        setFormData({ ...formData, assigned_offices: next });
+                                                    }}
+                                                    style={{ fontSize: '0.7rem', padding: '4px 10px', borderRadius: '8px', background: '#f1f5f9', color: '#64748b', border: 'none', fontWeight: 700, cursor: 'pointer' }}
+                                                >
+                                                    Clear All
+                                                </button>
+                                            </div>
+                                        )}
                                         <div style={{ position: 'relative', width: '250px' }}>
-                                            <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-                                            <input 
+                                            <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#fb923c' }} />
+                                            <input
                                                 type="text"
-                                                placeholder="Search offices..."
+                                                placeholder="Quick search offices..."
                                                 value={officeSearchTerm}
                                                 onChange={(e) => setOfficeSearchTerm(e.target.value)}
                                                 style={{
                                                     width: '100%',
-                                                    padding: '6px 10px 6px 32px',
-                                                    fontSize: '0.75rem',
-                                                    borderRadius: '10px',
-                                                    border: '1px solid #e2e8f0',
+                                                    padding: '8px 10px 8px 34px',
+                                                    fontSize: '0.8rem',
+                                                    borderRadius: '12px',
+                                                    border: '1px solid #fb923c40',
                                                     outline: 'none',
-                                                    background: 'white'
+                                                    background: 'white',
+                                                    fontWeight: 500
                                                 }}
                                             />
                                         </div>
-                                    )}
+                                    </div>
                                 </label>
-                                <div style={{
-                                    maxHeight: '250px',
+                                <div className="glass" style={{
+                                    maxHeight: '350px',
                                     overflowY: 'auto',
-                                    padding: '1.25rem',
-                                    background: '#f8fafc',
-                                    borderRadius: '20px',
+                                    padding: '1.5rem',
+                                    background: 'rgba(248, 250, 252, 0.5)',
+                                    borderRadius: '24px',
                                     border: '1px solid #e2e8f0',
                                     display: 'grid',
-                                    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                                    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
                                     gap: '1rem'
                                 }}>
                                     {(() => {
-                                        let filteredOffices = (offices || []).filter(o => !formData.assigned_level || o.level == formData.assigned_level);
-                                        
+                                        let filteredOffices = (offices || []).filter(o => !formData.assigned_level || String(o.level) === String(formData.assigned_level));
+
                                         if (officeSearchTerm && formData.assigned_level) {
                                             const q = officeSearchTerm.toLowerCase().trim();
                                             filteredOffices = filteredOffices.filter(o => o.name?.toLowerCase().includes(q) || o.code?.toLowerCase().includes(q));
                                         }
 
-                                        return filteredOffices.length > 0 ? filteredOffices.map(off => (
-                                            <label key={off.id} style={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '12px',
-                                                padding: '12px',
-                                                background: 'white',
-                                                border: (formData.assigned_offices || []).includes(off.id) ? '2px solid #fb923c' : '2px solid #f1f5f9',
-                                                borderRadius: '16px',
-                                                cursor: 'pointer',
-                                                transition: 'all 0.2s',
-                                                boxShadow: (formData.assigned_offices || []).includes(off.id) ? '0 4px 6px -1px rgba(251, 146, 60, 0.1)' : 'none'
-                                            }}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={(() => {
-                                                        const isExplicit = (formData.assigned_offices || []).map(String).includes(String(off.id));
-                                                        const master = facilityMasters?.find(m => String(m.id) === String(off.facility_master));
-                                                        // Check if this office's master is linked to THIS project (formData.id)
-                                                        const isImplicit = master && String(master.project) === String(formData.id);
-                                                        return isExplicit || isImplicit;
-                                                    })()}
-                                                    onChange={(e) => {
-                                                        const current = (formData.assigned_offices || []).map(String);
-                                                        const oid = String(off.id);
-                                                        let next;
-                                                        if (e.target.checked) {
-                                                            if (!current.includes(oid)) next = [...current, oid];
-                                                            else next = current;
-                                                        } else {
-                                                            next = current.filter(id => id !== oid);
-                                                        }
-                                                        setFormData({ ...formData, assigned_offices: next });
-                                                    }}
-                                                    style={{ accentColor: '#fb923c', width: '18px', height: '18px' }}
-                                                />
-                                                <div>
-                                                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e293b' }}>{off.name}</div>
-                                                    <div style={{ fontSize: '0.7rem', color: '#64748b' }}>{off.level_display || off.level_name}</div>
-                                                </div>
-                                            </label>
-                                        )) : (
-                                            <div style={{ gridColumn: '1 / -1', padding: '3rem', textAlign: 'center' }}>
-                                                <Building2 size={48} style={{ margin: '0 auto 1rem', opacity: 0.1 }} />
-                                                <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.9rem', fontWeight: 500 }}>No offices found for the selected level.</p>
+                                        return filteredOffices.length > 0 ? filteredOffices.map(off => {
+                                            const isExplicit = (formData.assigned_offices || []).map(String).includes(String(off.id));
+                                            const master = facilityMasters?.find(m => String(m.id) === String(off.facility_master));
+                                            const isImplicit = master && String(master.project) === String(formData.id);
+                                            const isChecked = isExplicit || isImplicit;
+
+                                            return (
+                                                <label key={off.id} style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '12px',
+                                                    padding: '14px',
+                                                    background: isChecked ? '#fff7ed' : 'white',
+                                                    border: isChecked ? '2px solid #fb923c' : '2px solid #f1f5f9',
+                                                    borderRadius: '18px',
+                                                    cursor: isImplicit ? 'default' : 'pointer',
+                                                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                                    boxShadow: isChecked ? '0 10px 15px -3px rgba(251, 146, 60, 0.1)' : 'none',
+                                                    position: 'relative',
+                                                    opacity: isImplicit ? 0.9 : 1
+                                                }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isChecked}
+                                                        disabled={isImplicit}
+                                                        onChange={(e) => {
+                                                            if (isImplicit) return;
+                                                            const current = (formData.assigned_offices || []).map(String);
+                                                            const oid = String(off.id);
+                                                            let next;
+                                                            if (e.target.checked) {
+                                                                if (!current.includes(oid)) next = [...current, oid];
+                                                                else next = current;
+                                                            } else {
+                                                                next = current.filter(id => id !== oid);
+                                                            }
+                                                            setFormData({ ...formData, assigned_offices: next });
+                                                        }}
+                                                        style={{ accentColor: '#fb923c', width: '20px', height: '20px', cursor: isImplicit ? 'default' : 'pointer' }}
+                                                    />
+                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                        <div style={{ fontSize: '0.85rem', fontWeight: 800, color: isChecked ? '#9a3412' : '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                            {off.name}
+                                                        </div>
+                                                        <div style={{ fontSize: '0.7rem', color: isChecked ? '#ea580c' : '#64748b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                            <Layers size={10} /> {off.level_display || off.level_name} • {off.code}
+                                                        </div>
+                                                    </div>
+                                                    {isImplicit && (
+                                                        <div title="Inherited from Facility Master" style={{ position: 'absolute', top: '8px', right: '8px' }}>
+                                                            <Link size={12} color="#fb923c" />
+                                                        </div>
+                                                    )}
+                                                </label>
+                                            );
+                                        }) : (
+                                            <div style={{ gridColumn: '1 / -1', padding: '4rem 2rem', textAlign: 'center', background: 'white', borderRadius: '24px', border: '2px dashed #e2e8f0' }}>
+                                                <Building2 size={48} style={{ margin: '0 auto 1.5rem', opacity: 0.1, color: '#fb923c' }} />
+                                                <p style={{ margin: 0, color: '#64748b', fontSize: '1rem', fontWeight: 600 }}>No offices matching your criteria.</p>
+                                                <p style={{ margin: '0.5rem 0 0', color: '#94a3b8', fontSize: '0.8rem' }}>Adjust filters or select a different organizational level.</p>
                                             </div>
                                         );
                                     })()}
