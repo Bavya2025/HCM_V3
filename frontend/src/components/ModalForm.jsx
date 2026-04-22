@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
     Layers,
     Edit,
@@ -88,6 +88,18 @@ const ModalForm = () => {
         validationErrors,
         setValidationErrors
     } = useData();
+    
+    const [officeSearchTerm, setOfficeSearchTerm] = useState('');
+
+    const filteredOffices = useMemo(() => {
+        if (modalType !== 'Projects') return [];
+        let filtered = (offices || []).filter(o => !formData.assigned_level || String(o.level) === String(formData.assigned_level));
+        if (officeSearchTerm && formData.assigned_level) {
+            const q = officeSearchTerm.toLowerCase().trim();
+            filtered = filtered.filter(o => o.name?.toLowerCase().includes(q) || o.code?.toLowerCase().includes(q));
+        }
+        return filtered;
+    }, [offices, formData.assigned_level, officeSearchTerm, modalType]);
 
     // Reset URL to reflect "Edit" with MASKED ID
     const selectedMaster = facilityMasters?.find(m => String(m.id) === String(formData.facility_master));
@@ -3967,77 +3979,68 @@ const ModalForm = () => {
                                     gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
                                     gap: '1rem'
                                 }}>
-                                    {(() => {
-                                        let filteredOffices = (offices || []).filter(o => !formData.assigned_level || String(o.level) === String(formData.assigned_level));
+                                    {filteredOffices.length > 0 ? filteredOffices.map(off => {
+                                        const isExplicit = (formData.assigned_offices || []).map(String).includes(String(off.id));
+                                        const master = facilityMasters?.find(m => String(m.id) === String(off.facility_master));
+                                        const isImplicit = master && String(master.project) === String(formData.id);
+                                        const isChecked = isExplicit || isImplicit;
 
-                                        if (officeSearchTerm && formData.assigned_level) {
-                                            const q = officeSearchTerm.toLowerCase().trim();
-                                            filteredOffices = filteredOffices.filter(o => o.name?.toLowerCase().includes(q) || o.code?.toLowerCase().includes(q));
-                                        }
-
-                                        return filteredOffices.length > 0 ? filteredOffices.map(off => {
-                                            const isExplicit = (formData.assigned_offices || []).map(String).includes(String(off.id));
-                                            const master = facilityMasters?.find(m => String(m.id) === String(off.facility_master));
-                                            const isImplicit = master && String(master.project) === String(formData.id);
-                                            const isChecked = isExplicit || isImplicit;
-
-                                            return (
-                                                <label key={off.id} style={{
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '12px',
-                                                    padding: '14px',
-                                                    background: isChecked ? '#fff7ed' : 'white',
-                                                    border: isChecked ? '2px solid #fb923c' : '2px solid #f1f5f9',
-                                                    borderRadius: '18px',
-                                                    cursor: isImplicit ? 'default' : 'pointer',
-                                                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                                                    boxShadow: isChecked ? '0 10px 15px -3px rgba(251, 146, 60, 0.1)' : 'none',
-                                                    position: 'relative',
-                                                    opacity: isImplicit ? 0.9 : 1
-                                                }}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={isChecked}
-                                                        disabled={isImplicit}
-                                                        onChange={(e) => {
-                                                            if (isImplicit) return;
-                                                            const current = (formData.assigned_offices || []).map(String);
-                                                            const oid = String(off.id);
-                                                            let next;
-                                                            if (e.target.checked) {
-                                                                if (!current.includes(oid)) next = [...current, oid];
-                                                                else next = current;
-                                                            } else {
-                                                                next = current.filter(id => id !== oid);
-                                                            }
-                                                            setFormData({ ...formData, assigned_offices: next });
-                                                        }}
-                                                        style={{ accentColor: '#fb923c', width: '20px', height: '20px', cursor: isImplicit ? 'default' : 'pointer' }}
-                                                    />
-                                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                                        <div style={{ fontSize: '0.85rem', fontWeight: 800, color: isChecked ? '#9a3412' : '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                            {off.name}
-                                                        </div>
-                                                        <div style={{ fontSize: '0.7rem', color: isChecked ? '#ea580c' : '#64748b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                            <Layers size={10} /> {off.level_display || off.level_name} • {off.code}
-                                                        </div>
+                                        return (
+                                            <label key={off.id} style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '12px',
+                                                padding: '14px',
+                                                background: isChecked ? '#fff7ed' : 'white',
+                                                border: isChecked ? '2px solid #fb923c' : '2px solid #f1f5f9',
+                                                borderRadius: '18px',
+                                                cursor: isImplicit ? 'default' : 'pointer',
+                                                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                                boxShadow: isChecked ? '0 10px 15px -3px rgba(251, 146, 60, 0.1)' : 'none',
+                                                position: 'relative',
+                                                opacity: isImplicit ? 0.9 : 1
+                                            }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isChecked}
+                                                    disabled={isImplicit}
+                                                    onChange={(e) => {
+                                                        if (isImplicit) return;
+                                                        const current = (formData.assigned_offices || []).map(String);
+                                                        const oid = String(off.id);
+                                                        let next;
+                                                        if (e.target.checked) {
+                                                            if (!current.includes(oid)) next = [...current, oid];
+                                                            else next = current;
+                                                        } else {
+                                                            next = current.filter(id => id !== oid);
+                                                        }
+                                                        setFormData({ ...formData, assigned_offices: next });
+                                                    }}
+                                                    style={{ accentColor: '#fb923c', width: '20px', height: '20px', cursor: isImplicit ? 'default' : 'pointer' }}
+                                                />
+                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                    <div style={{ fontSize: '0.85rem', fontWeight: 800, color: isChecked ? '#9a3412' : '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                        {off.name}
                                                     </div>
-                                                    {isImplicit && (
-                                                        <div title="Inherited from Facility Master" style={{ position: 'absolute', top: '8px', right: '8px' }}>
-                                                            <Link size={12} color="#fb923c" />
-                                                        </div>
-                                                    )}
-                                                </label>
-                                            );
-                                        }) : (
-                                            <div style={{ gridColumn: '1 / -1', padding: '4rem 2rem', textAlign: 'center', background: 'white', borderRadius: '24px', border: '2px dashed #e2e8f0' }}>
-                                                <Building2 size={48} style={{ margin: '0 auto 1.5rem', opacity: 0.1, color: '#fb923c' }} />
-                                                <p style={{ margin: 0, color: '#64748b', fontSize: '1rem', fontWeight: 600 }}>No offices matching your criteria.</p>
-                                                <p style={{ margin: '0.5rem 0 0', color: '#94a3b8', fontSize: '0.8rem' }}>Adjust filters or select a different organizational level.</p>
-                                            </div>
+                                                    <div style={{ fontSize: '0.7rem', color: isChecked ? '#ea580c' : '#64748b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                        <Layers size={10} /> {off.level_display || off.level_name} • {off.code}
+                                                    </div>
+                                                </div>
+                                                {isImplicit && (
+                                                    <div title="Inherited from Facility Master" style={{ position: 'absolute', top: '8px', right: '8px' }}>
+                                                        <Link size={12} color="#fb923c" />
+                                                    </div>
+                                                )}
+                                            </label>
                                         );
-                                    })()}
+                                    }) : (
+                                        <div style={{ gridColumn: '1 / -1', padding: '4rem 2rem', textAlign: 'center', background: 'white', borderRadius: '24px', border: '2px dashed #e2e8f0' }}>
+                                            <Building2 size={48} style={{ margin: '0 auto 1.5rem', opacity: 0.1, color: '#fb923c' }} />
+                                            <p style={{ margin: 0, color: '#64748b', fontSize: '1rem', fontWeight: 600 }}>No offices matching your criteria.</p>
+                                            <p style={{ margin: '0.5rem 0 0', color: '#94a3b8', fontSize: '0.8rem' }}>Adjust filters or select a different organizational level.</p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>

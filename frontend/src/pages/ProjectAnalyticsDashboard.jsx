@@ -20,6 +20,7 @@ const ProjectAnalyticsDashboard = () => {
     const [employeeSearch, setEmployeeSearch] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [hoveredCard, setHoveredCard] = useState(null);
+    const [activeTab, setActiveTab] = useState('overview');
     const ITEMS_PER_PAGE = 10;
 
     // Helper component for visual search highlighting
