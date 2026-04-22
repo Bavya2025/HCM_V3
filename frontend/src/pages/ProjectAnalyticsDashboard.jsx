@@ -52,7 +52,7 @@ const ProjectAnalyticsDashboard = () => {
         glass: 'rgba(255, 255, 255, 0.03)',
         border: 'rgba(255, 255, 255, 0.1)',
         primary: '#f97316', // Orange
-        secondary: '#10b981', // Emerald
+        secondary: '#00f2ff', // Electric Cyan (Neon Blue)
         tertiary: '#facc15', // Yellow
         success: '#10b981', // Emerald
         warning: '#facc15', // Yellow
@@ -398,39 +398,77 @@ const ProjectAnalyticsDashboard = () => {
                 )}
 
                 {activeTab === 'analytics' && (
-                    <div className="fade-in-up" style={{ background: theme.surface, padding: '3rem', borderRadius: '40px', border: `1px solid ${theme.border}` }}>
+                    <div className="fade-in-up" style={{ 
+                        background: 'rgba(15, 23, 42, 0.4)', 
+                        padding: '3rem', 
+                        borderRadius: '40px', 
+                        border: `1px solid ${theme.secondary}20`,
+                        boxShadow: `0 0 40px ${theme.secondary}05`
+                    }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem' }}>
                             <div>
-                                <h2 style={{ fontSize: '2rem', fontWeight: 900 }}>Personnel Resilience Matrix</h2>
-                                <p style={{ color: theme.textDim }}>Historical and current workforce deployment data across all domains.</p>
+                                <h2 style={{ fontSize: '2.2rem', fontWeight: 900, color: theme.secondary }}>Project Intelligence Vector</h2>
+                                <p style={{ color: theme.textDim }}>Tactical workforce density and strategic capacity analysis.</p>
                             </div>
                             <div style={{ display: 'flex', gap: '2rem' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                    <div style={{ width: '12px', height: '12px', borderRadius: '4px', background: theme.primary }} />
-                                    <span style={{ fontSize: '0.75rem', fontWeight: 900, color: theme.textDim }}>DEPLOYED</span>
+                                    <div style={{ width: '12px', height: '12px', borderRadius: '4px', background: theme.secondary, boxShadow: `0 0 10px ${theme.secondary}` }} />
+                                    <span style={{ fontSize: '0.75rem', fontWeight: 900, color: theme.textDim }}>DEPLOYED UNITS</span>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                     <div style={{ width: '12px', height: '12px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)' }} />
-                                    <span style={{ fontSize: '0.75rem', fontWeight: 900, color: theme.textDim }}>RESERVE / VACANT</span>
+                                    <span style={{ fontSize: '0.75rem', fontWeight: 900, color: theme.textDim }}>VACANT NODES</span>
                                 </div>
                             </div>
                         </div>
-                        <div style={{ width: '100%', height: 500 }}>
+                        <div style={{ width: '100%', height: 550 }}>
                             <ResponsiveContainer>
-                                <BarChart data={projectStats.slice(0, 15)} margin={{ top: 10, right: 30, left: 0, bottom: 20 }}>
+                                <AreaChart data={projectStats.slice(0, 15)} margin={{ top: 10, right: 30, left: 0, bottom: 20 }}>
                                     <defs>
-                                        <linearGradient id="primaryGradient" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="0%" stopColor={theme.primary} stopOpacity={1} />
-                                            <stop offset="100%" stopColor={theme.tertiary} stopOpacity={1} />
+                                        <linearGradient id="neonGlow" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor={theme.secondary} stopOpacity={0.3}/>
+                                            <stop offset="95%" stopColor={theme.secondary} stopOpacity={0}/>
                                         </linearGradient>
+                                        <filter id="glow">
+                                            <feGaussianBlur stdDeviation="5" result="coloredBlur"/>
+                                            <feMerge>
+                                                <feMergeNode in="coloredBlur"/>
+                                                <feMergeNode in="SourceGraphic"/>
+                                            </feMerge>
+                                        </filter>
                                     </defs>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
-                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: theme.textDim, fontSize: 11, fontWeight: 700 }} height={80} angle={-45} textAnchor="end" />
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.03)" />
+                                    <XAxis 
+                                        dataKey="name" 
+                                        axisLine={false} 
+                                        tickLine={false} 
+                                        tick={{ fill: theme.textDim, fontSize: 11, fontWeight: 700 }} 
+                                        height={80} angle={-45} textAnchor="end" 
+                                    />
                                     <YAxis axisLine={false} tickLine={false} tick={{ fill: theme.textDim, fontSize: 12, fontWeight: 700 }} />
-                                    <Tooltip contentStyle={{ background: '#0f172a', border: `1px solid ${theme.border}`, borderRadius: '20px', color: 'white', fontWeight: 700 }} />
-                                    <Bar dataKey="totalEmployees" stackId="a" fill="url(#primaryGradient)" barSize={45} radius={[0, 0, 0, 0]} />
-                                    <Bar dataKey="totalVacancies" stackId="a" fill="rgba(255,255,255,0.05)" barSize={45} radius={[10, 10, 0, 0]} />
-                                </BarChart>
+                                    <Tooltip 
+                                        contentStyle={{ background: '#020617', border: `1px solid ${theme.secondary}30`, borderRadius: '15px', color: 'white', fontWeight: 700, boxShadow: `0 0 20px ${theme.secondary}20` }} 
+                                        itemStyle={{ color: theme.secondary }}
+                                    />
+                                    <Area 
+                                        type="monotone" 
+                                        dataKey="totalEmployees" 
+                                        stroke={theme.secondary} 
+                                        strokeWidth={4}
+                                        fillOpacity={1} 
+                                        fill="url(#neonGlow)" 
+                                        filter="url(#glow)"
+                                        animationDuration={2000}
+                                    />
+                                    <Area 
+                                        type="monotone" 
+                                        dataKey="totalPositions" 
+                                        stroke="rgba(255,255,255,0.1)" 
+                                        strokeDasharray="5 5"
+                                        fillOpacity={0} 
+                                        strokeWidth={1}
+                                    />
+                                </AreaChart>
                             </ResponsiveContainer>
                         </div>
                     </div>
