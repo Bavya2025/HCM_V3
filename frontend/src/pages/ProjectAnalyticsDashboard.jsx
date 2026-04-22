@@ -18,9 +18,9 @@ const ProjectAnalyticsDashboard = () => {
     const [selectedProjectId, setSelectedProjectId] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [employeeSearch, setEmployeeSearch] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
     const [hoveredCard, setHoveredCard] = useState(null);
-    const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'matrix'
-    const [activeTab, setActiveTab] = useState('overview');
+    const ITEMS_PER_PAGE = 10;
 
     // Helper component for visual search highlighting
     const HighlightText = ({ text, highlight }) => {
@@ -45,18 +45,18 @@ const ProjectAnalyticsDashboard = () => {
         );
     };
 
-    // Premium Design System Tokens
+    // Premium Tactical Color Palette
     const theme = {
         bg: '#020617',
         surface: 'rgba(15, 23, 42, 0.8)',
         glass: 'rgba(255, 255, 255, 0.03)',
         border: 'rgba(255, 255, 255, 0.1)',
-        primary: '#f472b6', // Pink
-        secondary: '#38bdf8', // Blue
-        tertiary: '#818cf8', // Indigo
-        success: '#10b981',
-        warning: '#f59e0b',
-        danger: '#ef4444',
+        primary: '#f97316', // Orange
+        secondary: '#10b981', // Emerald
+        tertiary: '#facc15', // Yellow
+        success: '#10b981', // Emerald
+        warning: '#facc15', // Yellow
+        danger: '#ef4444', // Red
         textMain: '#f8fafc',
         textDim: '#94a3b8'
     };
@@ -140,12 +140,22 @@ const ProjectAnalyticsDashboard = () => {
     const manifestEmployees = useMemo(() => {
         if (!selectedProject) return [];
         const q = employeeSearch.toLowerCase().trim();
-        if (!q) return selectedProject.employees;
         return selectedProject.employees.filter(e => 
             e.name?.toLowerCase().includes(q) || 
             e.employee_code?.toLowerCase().includes(q)
         );
     }, [selectedProject, employeeSearch]);
+
+    const paginatedEmployees = useMemo(() => {
+        const start = (currentPage - 1) * ITEMS_PER_PAGE;
+        return manifestEmployees.slice(start, start + ITEMS_PER_PAGE);
+    }, [manifestEmployees, currentPage]);
+
+    const totalPages = Math.ceil(manifestEmployees.length / ITEMS_PER_PAGE);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [employeeSearch, selectedProjectId]);
 
     if (loading) return (
         <div style={{ background: theme.bg, height: '100vh', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '2rem' }}>
@@ -229,8 +239,8 @@ const ProjectAnalyticsDashboard = () => {
                 {/* ─── CRITICAL METRICS ─── */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1.5rem', marginBottom: '4rem' }}>
                     {[
-                        { label: 'ACTIVE DOMAINS', value: summary.totalProjects, icon: <Layout />, color: theme.secondary, trend: '+2' },
-                        { label: 'TOTAL PERSONNEL', value: summary.totalWorkforce, icon: <Users />, color: theme.primary, trend: '+12%' },
+                        { label: 'ACTIVE DOMAINS', value: summary.totalProjects, icon: <Layout />, color: theme.primary, trend: '+2' },
+                        { label: 'TOTAL PERSONNEL', value: summary.totalWorkforce, icon: <Users />, color: theme.secondary, trend: '+12%' },
                         { label: 'OPEN VACANCIES', value: summary.totalVacancies, icon: <Target />, color: theme.warning, trend: '-4' },
                         { label: 'DOMAIN UPTIME', value: `${summary.utilization}%`, icon: <Activity />, color: theme.success, trend: 'OPTIMAL' },
                         { label: 'CRITICAL ALERTS', value: summary.criticalAlerts, icon: <AlertTriangle />, color: theme.danger, trend: 'ACTION REQ', isAlert: summary.criticalAlerts > 0 }
@@ -467,9 +477,9 @@ const ProjectAnalyticsDashboard = () => {
                             </div>
 
                             <div style={{ flex: 1, overflowY: 'auto', paddingRight: '1rem' }} className="custom-scroll">
-                                {manifestEmployees.length > 0 ? (
+                                {paginatedEmployees.length > 0 ? (
                                     <div style={{ display: 'grid', gap: '1rem' }}>
-                                        {manifestEmployees.map((emp, i) => (
+                                        {paginatedEmployees.map((emp, i) => (
                                             <div key={emp.id} className="manifest-item" style={{
                                                 padding: '1.5rem',
                                                 background: 'rgba(255,255,255,0.02)',
@@ -510,6 +520,43 @@ const ProjectAnalyticsDashboard = () => {
                                     </div>
                                 )}
                             </div>
+
+                            {/* PAGINATION CONTROLS */}
+                            {totalPages > 1 && (
+                                <div style={{ 
+                                    marginTop: '2rem', 
+                                    padding: '1.5rem', 
+                                    borderTop: `1px solid ${theme.border}`,
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center'
+                                }}>
+                                    <div style={{ fontSize: '0.8rem', color: theme.textDim, fontWeight: 700 }}>
+                                        Showing {((currentPage-1)*ITEMS_PER_PAGE)+1}-{Math.min(currentPage*ITEMS_PER_PAGE, manifestEmployees.length)} of {manifestEmployees.length}
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                        <button 
+                                            disabled={currentPage === 1}
+                                            onClick={() => setCurrentPage(prev => prev - 1)}
+                                            className="tactical-btn"
+                                            style={{ opacity: currentPage === 1 ? 0.3 : 1, padding: '8px 15px' }}
+                                        >
+                                            PREV
+                                        </button>
+                                        <div style={{ padding: '8px 15px', background: 'rgba(255,255,255,0.05)', borderRadius: '10px', fontSize: '0.9rem', fontWeight: 900, minWidth: '40px', textAlign: 'center' }}>
+                                            {currentPage}
+                                        </div>
+                                        <button 
+                                            disabled={currentPage === totalPages}
+                                            onClick={() => setCurrentPage(prev => prev + 1)}
+                                            className="tactical-btn"
+                                            style={{ opacity: currentPage === totalPages ? 0.3 : 1, padding: '8px 15px' }}
+                                        >
+                                            NEXT
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
