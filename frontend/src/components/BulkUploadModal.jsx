@@ -350,8 +350,8 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
                     'geo-states': ['Continent', 'Country', 'State', 'State Code'],
                     'geo-districts': ['Continent', 'Country', 'State', 'District', 'District Code'],
                     'geo-mandals': ['Continent', 'Country', 'State', 'District', 'Mandal', 'Mandal Code'],
-                    'geo-clusters': ['Continent', 'Country', 'State', 'District', 'Mandal', 'Cluster', 'Cluster Code'],
-                    'offices': ['Office Name', 'Office Code', 'Structural Tier', 'Parent Office', 'Cluster', 'Start Date'],
+                    'geo-clusters': ['Continent', 'Country', 'State', 'District', 'Mandal', 'Cluster'],
+                    'offices': ['Office Name', 'Office Code', 'Structural Tier', 'Parent Office', 'Start Date'],
                     'departments': ['Department Name', 'Office'],
                     'sections': ['Section Name', 'Department']
                 };

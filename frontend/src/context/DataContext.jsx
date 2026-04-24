@@ -1607,7 +1607,7 @@ export const DataProvider = ({ children }) => {
         const effectiveFormData = { ...formData };
 
         // --- CUSTOM PRE-SUBMISSION VALIDATION ---
-        if (modalType === 'Clusters' && !effectiveFormData.id) {
+        if (modalType === 'Clusters' && !effectiveFormData.id && effectiveFormData.code) {
             const hasDuplicateCode = (geoClusters || []).some(c =>
                 c.code && effectiveFormData.code &&
                 String(c.code).toUpperCase() === String(effectiveFormData.code).toUpperCase()

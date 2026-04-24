@@ -3413,7 +3413,8 @@ class GeoBulkUploadView(APIView):
                         elif target_section == 'geo-mandals': target_code = mandal_code
                         elif target_section == 'geo-clusters': target_code = cluster_code
                         
-                        if not target_code or target_code.strip() == '-':
+                        # Also require code for the target section (Exception: Clusters are optional)
+                        if not validation_error and target_section != 'geo-clusters':
                             validation_error = f"{target_label} Code is required."
                     
                     if validation_error:
@@ -3532,11 +3533,13 @@ class GeoBulkUploadView(APIView):
                     if cluster_name:
                         cluster_type = (row.get('Cluster Type') or row.get('Category') or 'VILLAGE').upper().strip()
                         
-                        if cluster_code:
-                            if len(cluster_code) < 3 or len(cluster_code) > 5:
-                                raise Exception(f"Cluster Code '{cluster_code}' must be between 3 and 5 characters.")
+                        if cluster_code and cluster_code.strip() != '-':
+                            if len(cluster_code) > 4:
+                                raise Exception(f"Cluster Code '{cluster_code}' cannot exceed 4 characters.")
                             dup = GeoCluster.objects.filter(code=cluster_code).exclude(name=cluster_name).first()
                             if dup: raise Exception(f"Cluster Code '{cluster_code}' is already used by '{dup.name}'")
+                        else:
+                            cluster_code = ''
                             
                         cluster, cl_created = GeoCluster.objects.update_or_create(
                             name=cluster_name,

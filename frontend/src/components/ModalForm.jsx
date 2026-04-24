@@ -3566,6 +3566,18 @@ const ModalForm = () => {
 
 
         case 'Projects':
+            const filteredOffices = (offices || []).filter(o => {
+                // Search Term Filter
+                if (officeSearchTerm && !o.name.toLowerCase().includes(officeSearchTerm.toLowerCase()) && !o.code.toLowerCase().includes(officeSearchTerm.toLowerCase())) {
+                    return false;
+                }
+                
+                // Level Filter
+                if (!formData.assigned_level) return true; // Show ALL if no level filter is active
+                return String(o.level) === String(formData.assigned_level) ||
+                    (o.level && typeof o.level === 'object' && String(o.level.id) === String(formData.assigned_level));
+            });
+
             return (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                     {/* Project Core Identity */}
@@ -3905,7 +3917,7 @@ const ModalForm = () => {
                                         onChange={(e) => {
                                             const newVal = e.target.value || null;
                                             if (String(newVal) !== String(formData.assigned_level || null)) {
-                                                setFormData({ ...formData, assigned_level: newVal, assigned_offices: [] });
+                                                setFormData({ ...formData, assigned_level: newVal });
                                                 setOfficeSearchTerm('');
                                             }
                                         }}
@@ -3917,36 +3929,49 @@ const ModalForm = () => {
 
                             <div className="form-group full-width">
                                 <label className="premium-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                                    <span><Building2 size={14} /> Assigned Offices (Checklist)</span>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                                        {formData.assigned_level && (
-                                            <div style={{ display: 'flex', gap: '6px' }}>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const allFilteredIds = filteredOffices.map(o => String(o.id));
-                                                        const current = (formData.assigned_offices || []).map(String);
-                                                        const next = Array.from(new Set([...current, ...allFilteredIds]));
-                                                        setFormData({ ...formData, assigned_offices: next });
-                                                    }}
-                                                    style={{ fontSize: '0.7rem', padding: '4px 10px', borderRadius: '8px', background: '#fb923c', color: 'white', border: 'none', fontWeight: 700, cursor: 'pointer' }}
-                                                >
-                                                    Select All
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const allFilteredIds = filteredOffices.map(o => String(o.id));
-                                                        const current = (formData.assigned_offices || []).map(String);
-                                                        const next = current.filter(id => !allFilteredIds.includes(id));
-                                                        setFormData({ ...formData, assigned_offices: next });
-                                                    }}
-                                                    style={{ fontSize: '0.7rem', padding: '4px 10px', borderRadius: '8px', background: '#f1f5f9', color: '#64748b', border: 'none', fontWeight: 700, cursor: 'pointer' }}
-                                                >
-                                                    Clear All
-                                                </button>
-                                            </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span><Building2 size={14} /> Assigned Offices (Checklist)</span>
+                                        {(formData.assigned_offices || []).length > 0 && (
+                                            <span style={{ 
+                                                background: '#fb923c', 
+                                                color: 'white', 
+                                                padding: '2px 8px', 
+                                                borderRadius: '20px', 
+                                                fontSize: '0.7rem', 
+                                                fontWeight: 800,
+                                                boxShadow: '0 4px 6px -1px rgba(251, 146, 60, 0.2)'
+                                            }}>
+                                                {(formData.assigned_offices || []).length} Total Selected
+                                            </span>
                                         )}
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                        <div style={{ display: 'flex', gap: '6px' }}>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const allFilteredIds = filteredOffices.map(o => String(o.id));
+                                                    const current = (formData.assigned_offices || []).map(String);
+                                                    const next = Array.from(new Set([...current, ...allFilteredIds]));
+                                                    setFormData({ ...formData, assigned_offices: next });
+                                                }}
+                                                style={{ fontSize: '0.7rem', padding: '4px 10px', borderRadius: '8px', background: '#fb923c', color: 'white', border: 'none', fontWeight: 700, cursor: 'pointer' }}
+                                            >
+                                                Select All
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const allFilteredIds = filteredOffices.map(o => String(o.id));
+                                                    const current = (formData.assigned_offices || []).map(String);
+                                                    const next = current.filter(id => !allFilteredIds.includes(id));
+                                                    setFormData({ ...formData, assigned_offices: next });
+                                                }}
+                                                style={{ fontSize: '0.7rem', padding: '4px 10px', borderRadius: '8px', background: '#f1f5f9', color: '#64748b', border: 'none', fontWeight: 700, cursor: 'pointer' }}
+                                            >
+                                                Clear All
+                                            </button>
+                                        </div>
                                         <div style={{ position: 'relative', width: '250px' }}>
                                             <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#fb923c' }} />
                                             <input
@@ -3985,8 +4010,8 @@ const ModalForm = () => {
                                         const isImplicit = master && String(master.project) === String(formData.id);
                                         const isChecked = isExplicit || isImplicit;
 
-                                        return (
-                                            <label key={off.id} style={{
+                                            return (
+                                                <label key={off.id} style={{
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 gap: '12px',
