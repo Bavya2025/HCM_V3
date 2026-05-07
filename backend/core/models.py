@@ -903,6 +903,7 @@ class PositionActivityLog(models.Model):
         ordering = ['-timestamp']
 
 @receiver(post_save, sender=Office)
+@receiver(post_save, sender=Facility)
 def sync_office_to_visiting_location(sender, instance, **kwargs):
     # This fires for both Office and Facility since Facility inherits from Office
     
@@ -911,8 +912,13 @@ def sync_office_to_visiting_location(sender, instance, **kwargs):
     if instance.facility_master and instance.facility_master.mode == 'MOBILE':
         is_fixed = False
     
-    # If it's a facility record specifically, also check facility_type (standardized check)
-    if hasattr(instance, 'facility') and instance.facility:
+    # If it's a facility record specifically, check facility_type
+    # Case 1: instance is a Facility object
+    if hasattr(instance, 'facility_type'):
+        if instance.facility_type == 'MOBILE':
+            is_fixed = False
+    # Case 2: instance is an Office object that might have a linked Facility
+    elif hasattr(instance, 'facility') and instance.facility:
         if instance.facility.facility_type == 'MOBILE':
             is_fixed = False
 
@@ -947,6 +953,7 @@ def sync_office_to_visiting_location(sender, instance, **kwargs):
 
 
 @receiver(post_delete, sender=Office)
+@receiver(post_delete, sender=Facility)
 def delete_linked_visiting_location(sender, instance, **kwargs):
     VisitingLocation.objects.filter(office_ref=instance).delete()
 

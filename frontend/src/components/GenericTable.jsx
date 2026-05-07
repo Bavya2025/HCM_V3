@@ -494,78 +494,146 @@ const GenericTable = ({ renderTableData, customData = null }) => {
         }
 
         // Status filter: Proceed with local filtering as a second pass/fallback
-        if (statusFilter !== 'all') {
+        if (statusFilter === 'Unassigned') {
+            result = result.filter(item => !item.positions || item.positions.length === 0 || (item.positions_details && item.positions_details.length === 0));
+        } else if (statusFilter !== 'all') {
             result = result.filter(item => (item.status || 'Active') === statusFilter);
         }
 
-        // Office filter
-        if (officeFilter !== 'all') {
-            result = result.filter(item => {
-                // For Employees: Look up via positions_details
-                if (activeSection === 'employees' && item.positions_details) {
-                    return item.positions_details.some(p => matchesId(p.office_id, officeFilter));
-                }
+        if (statusFilter !== 'Unassigned') {
+            // Office filter
+            if (officeFilter !== 'all') {
+                result = result.filter(item => {
+                    // For Employees: Look up via positions_details
+                    if (activeSection === 'employees' && item.positions_details) {
+                        return item.positions_details.some(p => matchesId(p.office_id, officeFilter));
+                    }
 
-                // Direct match (Offices, Positions, etc.)
-                if (matchesId(item.office, officeFilter) || matchesId(item.office_id, officeFilter)) return true;
+                    // Direct match (Offices, Positions, etc.)
+                    if (matchesId(item.office, officeFilter) || matchesId(item.office_id, officeFilter)) return true;
 
-                // For Sections: Resolve via Department -> Office
-                if (activeSection === 'sections' && (item.department || item.department_id)) {
-                    const deptId = item.department_id || item.department;
-                    const dept = departments.find(d => matchesId(d.id, deptId));
-                    return dept && (matchesId(dept.office, officeFilter) || matchesId(dept.office_id, officeFilter));
-                }
+                    // For Sections: Resolve via Department -> Office
+                    if (activeSection === 'sections' && (item.department || item.department_id)) {
+                        const deptId = item.department_id || item.department;
+                        const dept = departments.find(d => matchesId(d.id, deptId));
+                        return dept && (matchesId(dept.office, officeFilter) || matchesId(dept.office_id, officeFilter));
+                    }
 
-                // For Departments: Resolve via Office
-                if (activeSection === 'departments') {
-                    // Departments usually have office_id directly, but if not:
-                    return matchesId(item.office, officeFilter) || matchesId(item.office_id, officeFilter);
-                }
+                    // For Departments: Resolve via Office
+                    if (activeSection === 'departments') {
+                        // Departments usually have office_id directly, but if not:
+                        return matchesId(item.office, officeFilter) || matchesId(item.office_id, officeFilter);
+                    }
 
-                return false;
-            });
-        }
+                    return false;
+                });
+            }
 
-        // Department filter
-        if (departmentFilter !== 'all') {
-            result = result.filter(item => {
-                if (matchesId(item.department, departmentFilter) || matchesId(item.department_id, departmentFilter)) return true;
+            // Department filter
+            if (departmentFilter !== 'all') {
+                result = result.filter(item => {
+                    if (matchesId(item.department, departmentFilter) || matchesId(item.department_id, departmentFilter)) return true;
 
-                // For Employees: Look up via positions_details
-                if (activeSection === 'employees' && item.positions_details) {
-                    return item.positions_details.some(p => matchesId(p.department_id, departmentFilter));
-                }
+                    // For Employees: Look up via positions_details
+                    if (activeSection === 'employees' && item.positions_details) {
+                        return item.positions_details.some(p => matchesId(p.department_id, departmentFilter));
+                    }
 
-                return false;
-            });
-        }
+                    return false;
+                });
+            }
 
-        // Section filter
-        if (sectionFilter !== 'all') {
-            result = result.filter(item => {
-                if (matchesId(item.section, sectionFilter) || matchesId(item.section_id, sectionFilter)) return true;
+            // Section filter
+            if (sectionFilter !== 'all') {
+                result = result.filter(item => {
+                    if (matchesId(item.section, sectionFilter) || matchesId(item.section_id, sectionFilter)) return true;
 
-                // For Employees: Look up via positions_details
-                if (activeSection === 'employees' && item.positions_details) {
-                    return item.positions_details.some(p => matchesId(p.section_id, sectionFilter));
-                }
+                    // For Employees: Look up via positions_details
+                    if (activeSection === 'employees' && item.positions_details) {
+                        return item.positions_details.some(p => matchesId(p.section_id, sectionFilter));
+                    }
 
-                return false;
-            });
-        }
+                    return false;
+                });
+            }
 
-        // Apply Hierarchy filters using unified logic
-        if (jobFamilyFilter !== 'all') {
-            result = result.filter(item => matchesHierarchy(item, jobFamilyFilter, 'all', 'all', 'all'));
-        }
-        if (roleTypeFilter !== 'all') {
-            result = result.filter(item => matchesHierarchy(item, 'all', roleTypeFilter, 'all', 'all'));
-        }
-        if (roleFilter !== 'all') {
-            result = result.filter(item => matchesHierarchy(item, 'all', 'all', roleFilter, 'all'));
-        }
-        if (jobFilter !== 'all') {
-            result = result.filter(item => matchesHierarchy(item, 'all', 'all', 'all', jobFilter));
+            // Apply Hierarchy filters using unified logic
+            if (jobFamilyFilter !== 'all') {
+                result = result.filter(item => matchesHierarchy(item, jobFamilyFilter, 'all', 'all', 'all'));
+            }
+            if (roleTypeFilter !== 'all') {
+                result = result.filter(item => matchesHierarchy(item, 'all', roleTypeFilter, 'all', 'all'));
+            }
+            if (roleFilter !== 'all') {
+                result = result.filter(item => matchesHierarchy(item, 'all', 'all', roleFilter, 'all'));
+            }
+            if (jobFilter !== 'all') {
+                result = result.filter(item => matchesHierarchy(item, 'all', 'all', 'all', jobFilter));
+            }
+
+            // Office Level Filter
+            if (officeLevelFilter !== 'all') {
+                const selectedLevelObj = (orgLevels || []).find(l => matchesId(l.id, officeLevelFilter));
+                const selectedLevelName = selectedLevelObj ? selectedLevelObj.name : '';
+
+                result = result.filter(item => {
+                    // Direct match
+                    if (item && (
+                        matchesId(item.level, officeLevelFilter) ||
+                        matchesId(item.level_id, officeLevelFilter) ||
+                        matchesId(item.office_level_id, officeLevelFilter) ||
+                        matchesId(item.office_level, officeLevelFilter) ||
+                        (selectedLevelName && (
+                            (item.level_name && item.level_name.trim().toLowerCase() === selectedLevelName.trim().toLowerCase()) ||
+                            (item.office_level && item.office_level.trim().toLowerCase() === selectedLevelName.trim().toLowerCase()) ||
+                            (item.level && typeof item.level === 'string' && item.level.trim().toLowerCase() === selectedLevelName.trim().toLowerCase())
+                        ))
+                    )) return true;
+
+                    // For Sections: Look up via Department -> Office -> Level
+                    if (activeSection === 'sections' && (item.department || item.department_id)) {
+                        const deptId = item.department_id || item.department;
+                        const dept = departments.find(d => matchesId(d.id, deptId));
+                        if (dept) {
+                            const office = offices.find(o => matchesId(o.id, dept.office) || matchesId(o.id, dept.office_id));
+                            return office && matchesId(office.level, officeLevelFilter);
+                        }
+                    }
+
+                    // For Departments: Look up via Office -> Level
+                    if (activeSection === 'departments' && (item.office || item.office_id)) {
+                        const officeId = item.office_id || item.office;
+                        const office = offices.find(o => matchesId(o.id, officeId));
+                        return office && matchesId(office.level, officeLevelFilter);
+                    }
+
+                    // For Employees: Look up via positions_details -> Office -> Level
+                    if (activeSection === 'employees' && item.positions_details) {
+                        return item.positions_details.some(p => matchesId(p.office_level_id, officeLevelFilter));
+                    }
+
+                    // For Positions: Look up via Office -> Level
+                    if (activeSection === 'positions' && item.office) {
+                        const office = offices.find(o => matchesId(o.id, item.office) || matchesId(o.id, item.office_id));
+                        return office && matchesId(office.level, officeLevelFilter);
+                    }
+
+                    return false;
+                });
+            }
+
+            // Position Level Filter
+            if (positionLevelFilter !== 'all') {
+                result = result.filter(item => {
+                    if (matchesId(item.level, positionLevelFilter) || matchesId(item.level_id, positionLevelFilter)) return true;
+
+                    // For Employees: Look up via positions_details
+                    if (activeSection === 'employees' && item.positions_details) {
+                        return item.positions_details.some(p => matchesId(p.level_id, positionLevelFilter));
+                    }
+                    return false;
+                });
+            }
         }
 
         // Task filter
@@ -626,57 +694,6 @@ const GenericTable = ({ renderTableData, customData = null }) => {
             result = result.filter(item =>
                 item && (matchesId(item.mandal, mandalFilter) || matchesId(item.mandal_id, mandalFilter) || ((activeSection === 'geo-mandals' || activeSection === 'geo-clusters') && matchesId(item.id, mandalFilter)))
             );
-        }
-
-        // Office Level Filter
-        if (officeLevelFilter !== 'all') {
-            const selectedLevelObj = (orgLevels || []).find(l => matchesId(l.id, officeLevelFilter));
-            const selectedLevelName = selectedLevelObj ? selectedLevelObj.name : '';
-
-            result = result.filter(item => {
-                // Direct match
-                if (item && (
-                    matchesId(item.level, officeLevelFilter) ||
-                    matchesId(item.level_id, officeLevelFilter) ||
-                    matchesId(item.office_level_id, officeLevelFilter) ||
-                    matchesId(item.office_level, officeLevelFilter) ||
-                    (selectedLevelName && (
-                        (item.level_name && item.level_name.trim().toLowerCase() === selectedLevelName.trim().toLowerCase()) ||
-                        (item.office_level && item.office_level.trim().toLowerCase() === selectedLevelName.trim().toLowerCase()) ||
-                        (item.level && typeof item.level === 'string' && item.level.trim().toLowerCase() === selectedLevelName.trim().toLowerCase())
-                    ))
-                )) return true;
-
-                // For Sections: Look up via Department -> Office -> Level
-                if (activeSection === 'sections' && (item.department || item.department_id)) {
-                    const deptId = item.department_id || item.department;
-                    const dept = departments.find(d => matchesId(d.id, deptId));
-                    if (dept) {
-                        const office = offices.find(o => matchesId(o.id, dept.office) || matchesId(o.id, dept.office_id));
-                        return office && matchesId(office.level, officeLevelFilter);
-                    }
-                }
-
-                // For Departments: Look up via Office -> Level
-                if (activeSection === 'departments' && (item.office || item.office_id)) {
-                    const officeId = item.office_id || item.office;
-                    const office = offices.find(o => matchesId(o.id, officeId));
-                    return office && matchesId(office.level, officeLevelFilter);
-                }
-
-                // For Employees: Look up via positions_details -> Office -> Level
-                if (activeSection === 'employees' && item.positions_details) {
-                    return item.positions_details.some(p => matchesId(p.office_level_id, officeLevelFilter));
-                }
-
-                // For Positions: Look up via Office -> Level
-                if (activeSection === 'positions' && item.office) {
-                    const office = offices.find(o => matchesId(o.id, item.office) || matchesId(o.id, item.office_id));
-                    return office && matchesId(office.level, officeLevelFilter);
-                }
-
-                return false;
-            });
         }
 
         // UNIVERSAL ALPHABETICAL & GROUPING SORT
@@ -968,6 +985,7 @@ const GenericTable = ({ renderTableData, customData = null }) => {
                             <option value="Active">Active</option>
                             <option value="Inactive">Inactive</option>
                             <option value="Blocked">Blocked</option>
+                            {activeSection === 'employees' && <option value="Unassigned">Unassigned (No Position)</option>}
                             {activeSection === 'employees' && <option value="Suspicious">Suspicious</option>}
                             {activeSection === 'employees' && <option value="Terminated">Terminated</option>}
                         </select>

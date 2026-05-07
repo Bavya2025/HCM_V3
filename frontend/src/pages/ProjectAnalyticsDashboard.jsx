@@ -12,6 +12,7 @@ import {
     Legend, ResponsiveContainer, Cell, ReferenceLine, AreaChart, Area,
     LineChart, Line
 } from 'recharts';
+import OrganizationMap from '../components/OrganizationMap';
 
 const ProjectAnalyticsDashboard = () => {
     const { projects, offices, departments, sections, positions, allEmployees, loading } = useData();
@@ -21,6 +22,12 @@ const ProjectAnalyticsDashboard = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [hoveredCard, setHoveredCard] = useState(null);
     const [activeTab, setActiveTab] = useState('overview');
+    const [internalLoading, setInternalLoading] = useState(true);
+
+    useEffect(() => {
+        const timer = setTimeout(() => setInternalLoading(false), 1200);
+        return () => clearTimeout(timer);
+    }, []);
     const ITEMS_PER_PAGE = 10;
 
     // Helper component for visual search highlighting
@@ -158,7 +165,7 @@ const ProjectAnalyticsDashboard = () => {
         setCurrentPage(1);
     }, [employeeSearch, selectedProjectId]);
 
-    if (loading) return (
+    if (internalLoading && loading) return (
         <div style={{ background: theme.bg, height: '100vh', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '2rem' }}>
             <div className="loader-ring"></div>
             <div style={{ fontSize: '1rem', fontWeight: 700, letterSpacing: '0.3em', color: theme.primary }} className="animate-pulse">INITIALIZING DOMAIN PROTOCOLS</div>
@@ -472,6 +479,20 @@ const ProjectAnalyticsDashboard = () => {
                                 </AreaChart>
                             </ResponsiveContainer>
                         </div>
+                    </div>
+                )}
+
+                {activeTab === 'risk-map' && (
+                    <div className="fade-in-up" style={{ 
+                        height: '650px', 
+                        background: 'rgba(15, 23, 42, 0.4)', 
+                        borderRadius: '40px', 
+                        border: `1px solid ${theme.secondary}20`,
+                        boxShadow: `0 0 40px ${theme.secondary}05`,
+                        overflow: 'hidden',
+                        position: 'relative'
+                    }}>
+                        <OrganizationMap offices={offices} selectedOfficeId={selectedProjectId} />
                     </div>
                 )}
 

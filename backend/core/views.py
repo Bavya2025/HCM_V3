@@ -2391,8 +2391,7 @@ class EmployeeViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelView
 
     def get_queryset(self):
         """Override to exclude deleted employees by default and apply filters"""
-        queryset = Employee.objects.filter(is_deleted=False).prefetch_related('positions', 'subordinates')
-        queryset = super().get_queryset()
+        queryset = super().get_queryset().filter(is_deleted=False).prefetch_related('positions', 'subordinates')
         
         # Performance: Deep prefetching for the light serializer's needs
         from django.db.models import Prefetch
@@ -2420,44 +2419,50 @@ class EmployeeViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelView
         job = self.request.query_params.get('job') or self.request.query_params.get('job_id')
         position_level = self.request.query_params.get('position_level')
 
-        if level and level != 'all':
-            if str(level).isdigit():
-                queryset = queryset.filter(positions__office__level_id=level)
-            else:
-                queryset = queryset.filter(positions__office__level__name=level)
-        if office and office != 'all':
-            if str(office).isdigit():
-                queryset = queryset.filter(positions__office_id=office)
-            else:
-                queryset = queryset.filter(positions__office__name=office)
-        if department and department != 'all':
-            if str(department).isdigit():
-                queryset = queryset.filter(positions__department_id=department)
-            else:
-                queryset = queryset.filter(positions__department__name=department)
-        if section and section != 'all':
-            if str(section).isdigit():
-                queryset = queryset.filter(positions__section_id=section)
-            else:
-                queryset = queryset.filter(positions__section__name=section)
-        if status and status != 'all':
+        if status == 'Unassigned':
+            # If specifically looking for unassigned, skip other position-based filters
+            queryset = queryset.filter(positions__isnull=True)
+        else:
+            # Apply specific filters from context
+            if level and level != 'all':
+                if str(level).isdigit():
+                    queryset = queryset.filter(positions__office__level_id=level)
+                else:
+                    queryset = queryset.filter(positions__office__level__name=level)
+            if office and office != 'all':
+                if str(office).isdigit():
+                    queryset = queryset.filter(positions__office_id=office)
+                else:
+                    queryset = queryset.filter(positions__office__name=office)
+            if department and department != 'all':
+                if str(department).isdigit():
+                    queryset = queryset.filter(positions__department_id=department)
+                else:
+                    queryset = queryset.filter(positions__department__name=department)
+            if section and section != 'all':
+                if str(section).isdigit():
+                    queryset = queryset.filter(positions__section_id=section)
+                else:
+                    queryset = queryset.filter(positions__section__name=section)
+            if job_family and job_family != 'all':
+                queryset = queryset.filter(positions__role__role_type__job_family_id=job_family)
+            if role_type and role_type != 'all':
+                queryset = queryset.filter(positions__role__role_type_id=role_type)
+            if role and role != 'all':
+                queryset = queryset.filter(positions__role_id=role)
+            if job and job != 'all':
+                queryset = queryset.filter(positions__job_id=job)
+            if position_level and position_level != 'all':
+                if str(position_level).isdigit():
+                    queryset = queryset.filter(positions__level_id=position_level)
+                else:
+                    queryset = queryset.filter(
+                        Q(positions__level__name__iexact=position_level) | 
+                        Q(positions__level__level_code__iexact=position_level)
+                    )
+
+        if status and status != 'all' and status != 'Unassigned':
             queryset = queryset.filter(status=status)
-        if job_family and job_family != 'all':
-            queryset = queryset.filter(positions__role__role_type__job_family_id=job_family)
-        if role_type and role_type != 'all':
-            queryset = queryset.filter(positions__role__role_type_id=role_type)
-        if role and role != 'all':
-            queryset = queryset.filter(positions__role_id=role)
-        if job and job != 'all':
-            queryset = queryset.filter(positions__job_id=job)
-        if position_level and position_level != 'all':
-            if str(position_level).isdigit():
-                queryset = queryset.filter(positions__level_id=position_level)
-            else:
-                queryset = queryset.filter(
-                    Q(positions__level__name__iexact=position_level) | 
-                    Q(positions__level__level_code__iexact=position_level)
-                )
             
         country_id = self.request.query_params.get('country')
         if country_id and country_id != 'all':

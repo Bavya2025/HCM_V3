@@ -32,7 +32,7 @@ const facilityIcon = new L.Icon({
 
 const MapController = ({ center, zoom, offices, viewMode }) => {
     const map = useMap();
-    
+
     useEffect(() => {
         // Fix Leaflet container resize issues after layout transitions (500ms)
         const timer = setTimeout(() => {
@@ -46,7 +46,7 @@ const MapController = ({ center, zoom, offices, viewMode }) => {
         if (offices && offices.length > 0) {
             try {
                 const bounds = L.latLngBounds(offices.map(o => [
-                    parseFloat(o.latitude), 
+                    parseFloat(o.latitude),
                     parseFloat(o.longitude)
                 ]));
                 // MaxZoom 12 prevents zooming in too much on very close markers
@@ -89,7 +89,7 @@ const OrganizationMap = ({ offices, selectedOfficeId, onOfficeClick, onViewDetai
                 const lng = parseFloat(selected.longitude);
                 if (!isNaN(lat) && !isNaN(lng)) {
                     setCenter([lat, lng]);
-                    setZoom(12); 
+                    setZoom(12);
                 }
             }
         } else if (withCoords.length > 0) {
@@ -126,10 +126,10 @@ const OrganizationMap = ({ offices, selectedOfficeId, onOfficeClick, onViewDetai
                         />
                     </BaseLayer>
                 </LayersControl>
-                
+
                 {mapOffices.map(office => (
-                    <Marker 
-                        key={office.id} 
+                    <Marker
+                        key={office.id}
                         position={[parseFloat(office.latitude), parseFloat(office.longitude)]}
                         icon={facilityIcon}
                         eventHandlers={{
@@ -147,7 +147,7 @@ const OrganizationMap = ({ offices, selectedOfficeId, onOfficeClick, onViewDetai
                                         <span className="popup-subtitle">{office.level_display || office.level_name}</span>
                                     </div>
                                 </div>
-                                
+
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                     <div className="popup-info-row">
                                         <MapPin size={14} style={{ color: 'var(--magenta)' }} />
@@ -157,8 +157,8 @@ const OrganizationMap = ({ offices, selectedOfficeId, onOfficeClick, onViewDetai
                                         <Navigation size={14} style={{ color: 'var(--orange)' }} />
                                         <span>{parseFloat(office.latitude || 0).toFixed(4)}, {parseFloat(office.longitude || 0).toFixed(4)}</span>
                                     </div>
-                                    
-                                    <button 
+
+                                    <button
                                         className="popup-btn-premium"
                                         onClick={() => onViewDetails ? onViewDetails(office) : (onOfficeClick && onOfficeClick(office))}
                                     >
@@ -169,10 +169,10 @@ const OrganizationMap = ({ offices, selectedOfficeId, onOfficeClick, onViewDetai
                         </Popup>
                     </Marker>
                 ))}
-                
+
                 <MapController center={center} zoom={zoom} offices={mapOffices} viewMode={viewMode} />
             </MapContainer>
-            
+
             {/* Legend / Overlay */}
             <div style={{
                 position: 'absolute',
