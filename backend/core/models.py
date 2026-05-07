@@ -905,51 +905,48 @@ class PositionActivityLog(models.Model):
 @receiver(post_save, sender=Office)
 @receiver(post_save, sender=Facility)
 def sync_office_to_visiting_location(sender, instance, **kwargs):
-    # This fires for both Office and Facility since Facility inherits from Office
+    # Determine if this is a Facility or a regular Office
+    is_facility = hasattr(instance, 'facility_type') or (hasattr(instance, 'facility') and instance.facility)
     
-    # Requirement: Only sync fixed facilities to visiting locations
-    is_fixed = True
-    if instance.facility_master and instance.facility_master.mode == 'MOBILE':
-        is_fixed = False
-    
-    # If it's a facility record specifically, check facility_type
-    # Case 1: instance is a Facility object
-    if hasattr(instance, 'facility_type'):
-        if instance.facility_type == 'MOBILE':
-            is_fixed = False
-    # Case 2: instance is an Office object that might have a linked Facility
-    elif hasattr(instance, 'facility') and instance.facility:
-        if instance.facility.facility_type == 'MOBILE':
-            is_fixed = False
-
-    if not is_fixed:
-        # If it was previously synced but now marked mobile, we should probably delete it
-        VisitingLocation.objects.filter(office_ref=instance).delete()
+    # Simple logic: If it has a name, it should be a Hotspot
+    if not instance.name:
         return
 
     defaults = {
         'name': instance.name,
-        'cluster': instance.cluster, # Directly use the cluster field added in migration 0048
-        'address': instance.address or "",
-        'contact_person': f"Office ({instance.name})",
-        'contact_number': instance.phone or ""
+        'cluster': getattr(instance, 'cluster', None),
+        'address': getattr(instance, 'address', '') or "",
+        'contact_person': f"{'Facility' if is_facility else 'Office'} ({instance.name})",
+        'contact_number': getattr(instance, 'phone', '') or ""
     }
 
-    # Copy latitude/longitude from Office or Facility (both share these fields)
-    if hasattr(instance, 'latitude') and instance.latitude is not None:
+    # Copy latitude/longitude
+    if getattr(instance, 'latitude', None) is not None:
         defaults['latitude'] = instance.latitude
-    if hasattr(instance, 'longitude') and instance.longitude is not None:
+    if getattr(instance, 'longitude', None) is not None:
         defaults['longitude'] = instance.longitude
 
-    # Fallback to child facility record if the data is only stored there (extra safety)
-    if not defaults.get('latitude') and hasattr(instance, 'facility') and instance.facility:
-        if instance.facility.latitude: defaults['latitude'] = instance.facility.latitude
-        if instance.facility.longitude: defaults['longitude'] = instance.facility.longitude
-
+    # Create or update the Visiting Location
+    # Using office_ref as the unique link. For Facilities, it uses the Office base part.
     VisitingLocation.objects.update_or_create(
-        office_ref=instance,
+        office_ref=instance.office_ptr if hasattr(instance, 'office_ptr') else instance,
         defaults=defaults
     )
+
+    
+
+
+    
+
+
+
+
+
+
+
+
+
+
 
 
 @receiver(post_delete, sender=Office)
