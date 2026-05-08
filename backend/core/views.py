@@ -2456,10 +2456,7 @@ class EmployeeViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelView
                 if str(position_level).isdigit():
                     queryset = queryset.filter(positions__level_id=position_level)
                 else:
-                    queryset = queryset.filter(
-                        Q(positions__level__name__iexact=position_level) | 
-                        Q(positions__level__level_code__iexact=position_level)
-                    )
+                    queryset = queryset.filter(positions__level__name__iexact=position_level)
 
         if status and status != 'all' and status != 'Unassigned':
             queryset = queryset.filter(status=status)
