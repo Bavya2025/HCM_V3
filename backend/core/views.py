@@ -2391,15 +2391,10 @@ class EmployeeViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelView
 
     def get_queryset(self):
         """Override to exclude deleted employees by default and apply filters"""
-        queryset = super().get_queryset().filter(is_deleted=False).prefetch_related('positions', 'subordinates')
+        queryset = super().get_queryset().filter(is_deleted=False)
         
-        # Performance: Deep prefetching for the light serializer's needs
-        from django.db.models import Prefetch
-        queryset = queryset.prefetch_related(
-            Prefetch('positions', queryset=Position.objects.select_related(
-                'office', 'department', 'section', 'role', 'job', 'office__level'
-            ))
-        )
+        # Optimize with select_related for common fields
+        queryset = queryset.prefetch_related('positions__office', 'positions__department', 'positions__section', 'positions__role', 'positions__job')
 
         # Filter out soft-deleted employees
         include_deleted = self.request.query_params.get('include_deleted', 'false').lower() == 'true'
