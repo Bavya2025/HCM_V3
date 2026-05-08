@@ -68,11 +68,15 @@ CORS_ALLOWED_ORIGINS = [
     "http://103.174.161.68:8002",
 ]
 
-CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = [
     "http://103.174.161.68",
+    "http://10.2.1.14:5174",
+    "http://10.2.1.14:5175",
+    "http://10.2.1.14",
+    "http://localhost:5175",
 ]
 
 CORS_ALLOW_HEADERS = [
@@ -119,7 +123,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': os.getenv('DB_NAME', 'HCM_V1'),
         'USER': os.getenv('DB_USER', 'root'),
-        'PASSWORD': os.getenv('DB_PASSWORD', ''),
+        'PASSWORD': os.getenv('DB_PASSWORD', 'Ramprasad1819@'),
         'HOST': os.getenv('DB_HOST', 'localhost'),
         'PORT': os.getenv('DB_PORT', '3306'),
         'OPTIONS': {
