@@ -88,7 +88,7 @@ const ModalForm = () => {
         validationErrors,
         setValidationErrors
     } = useData();
-    
+
     const [officeSearchTerm, setOfficeSearchTerm] = useState('');
 
     const filteredOffices = useMemo(() => {
@@ -376,17 +376,17 @@ const ModalForm = () => {
     };
 
     const validateAlphaNumeric = (value, maxLength = 50, fieldName = '') => {
-        // Allow only alphabets, numbers, spaces, and hyphens
-        const filtered = value.replace(/[^A-Za-z0-9\s-]/g, '');
+        // Allow alphabets, numbers, spaces, hyphens, and @
+        const filtered = value.replace(/[^A-Za-z0-9\s\-@]/g, '');
         if (filtered !== value && fieldName) {
-            showValidationError(fieldName, 'Only letters, numbers, spaces, and hyphens allowed');
+            showValidationError(fieldName, 'Only letters, numbers, spaces, hyphens, and @ allowed');
         }
         return capitalize(filtered).slice(0, maxLength);
     };
 
     const validateName = (value, maxLength = 50, fieldName = '') => {
-        // Disallow numbers and special characters - allow ONLY letters and spaces
-        let filtered = value.replace(/[^A-Za-z\s]/g, '');
+        // Allow letters, numbers, spaces, hyphens, and @
+        let filtered = value.replace(/[^A-Za-z0-9\s\-@]/g, '');
 
         // No spaces at front
         if (filtered.startsWith(' ')) {
@@ -394,18 +394,17 @@ const ModalForm = () => {
         }
 
         if (filtered !== value && fieldName) {
-            showValidationError(fieldName, 'Only letters and spaces allowed');
+            showValidationError(fieldName, 'Only letters, numbers, spaces, hyphens, and @ allowed');
         }
         return capitalize(filtered).slice(0, maxLength);
     };
 
     const validateAddress = (value, maxLength = 500, fieldName = '') => {
-        // Disallow special characters - allow letters, numbers, and spaces
-        // Usually addresses need , . / - but user specifically asked to disallow special characters
-        let filtered = value.replace(/[^A-Za-z0-9\s]/g, '');
+        // Allow letters, numbers, spaces, and hyphens
+        let filtered = value.replace(/[^A-Za-z0-9\s\-]/g, '');
 
         if (filtered !== value && fieldName) {
-            showValidationError(fieldName, 'Special characters are not allowed in address');
+            showValidationError(fieldName, 'Only letters, numbers, spaces, and hyphens allowed in address');
         }
         return capitalize(filtered).slice(0, maxLength);
     };
@@ -3571,7 +3570,7 @@ const ModalForm = () => {
                 if (officeSearchTerm && !o.name.toLowerCase().includes(officeSearchTerm.toLowerCase()) && !o.code.toLowerCase().includes(officeSearchTerm.toLowerCase())) {
                     return false;
                 }
-                
+
                 // Level Filter
                 if (!formData.assigned_level) return true; // Show ALL if no level filter is active
                 return String(o.level) === String(formData.assigned_level) ||
@@ -3932,12 +3931,12 @@ const ModalForm = () => {
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                         <span><Building2 size={14} /> Assigned Offices (Checklist)</span>
                                         {(formData.assigned_offices || []).length > 0 && (
-                                            <span style={{ 
-                                                background: '#fb923c', 
-                                                color: 'white', 
-                                                padding: '2px 8px', 
-                                                borderRadius: '20px', 
-                                                fontSize: '0.7rem', 
+                                            <span style={{
+                                                background: '#fb923c',
+                                                color: 'white',
+                                                padding: '2px 8px',
+                                                borderRadius: '20px',
+                                                fontSize: '0.7rem',
                                                 fontWeight: 800,
                                                 boxShadow: '0 4px 6px -1px rgba(251, 146, 60, 0.2)'
                                             }}>
@@ -4010,8 +4009,8 @@ const ModalForm = () => {
                                         const isImplicit = master && String(master.project) === String(formData.id);
                                         const isChecked = isExplicit || isImplicit;
 
-                                            return (
-                                                <label key={off.id} style={{
+                                        return (
+                                            <label key={off.id} style={{
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 gap: '12px',
