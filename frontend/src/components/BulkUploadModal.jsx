@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Upload, FileText, CheckCircle2, AlertCircle, Info, Loader2, Download, CloudUpload, RotateCcw, ShieldCheck, ChevronRight, FileCheck, Database, Zap, Layers, BarChart3, ArrowRight } from 'lucide-react';
+import { X, Upload, FileText, CheckCircle2, AlertCircle, Info, Loader2, Download, CloudUpload, RotateCcw, ShieldCheck, ChevronRight, FileCheck, Database, Zap, Layers, BarChart3, ArrowRight, DownloadCloud } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useData } from '../context/DataContext';
 import api from '../api';
@@ -99,6 +99,9 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
                 else if (et.includes('temp') || et.includes('cont')) normalized.employment_type = 'Temporary';
             }
 
+            const idKey = keys.find(k => k.toLowerCase() === 'id');
+            if (idKey) normalized['id'] = clean(row[idKey]);
+
             return normalized;
         }
 
@@ -140,6 +143,9 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
                 else normalized.Status = 'Active';
             }
 
+            const idKey = keys.find(k => k.toLowerCase() === 'id');
+            if (idKey) normalized['id'] = clean(row[idKey]);
+
             return normalized;
         }
 
@@ -168,6 +174,9 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
                 if (sourceKey) normalized[targetKey] = clean(row[sourceKey]);
             });
             if (normalized['Start Date']) normalized['Start Date'] = fixDate(normalized['Start Date']);
+            const idKey = keys.find(k => k.toLowerCase() === 'id');
+            if (idKey) normalized['id'] = clean(row[idKey]);
+
             return normalized;
         }
 
@@ -187,6 +196,9 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
                 });
                 if (sourceKey) normalized[targetKey] = clean(row[sourceKey]);
             });
+            const idKey = keys.find(k => k.toLowerCase() === 'id');
+            if (idKey) normalized['id'] = clean(row[idKey]);
+
             return normalized;
         }
 
@@ -207,6 +219,9 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
                 });
                 if (sourceKey) normalized[targetKey] = clean(row[sourceKey]);
             });
+            const idKey = keys.find(k => k.toLowerCase() === 'id');
+            if (idKey) normalized['id'] = clean(row[idKey]);
+
             return normalized;
         }
 
@@ -581,6 +596,30 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
         XLSX.writeFile(wb, `${section}_Master_Template.xlsx`);
     };
 
+    const downloadCurrentData = async () => {
+        try {
+            setLoading(true);
+            const s = (section || '').toLowerCase();
+            const endpoint = `${s}/export-csv/`;
+            const blob = await api.blob(endpoint);
+            
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `${section}_mass_update_template_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            
+            showNotification(`Successfully exported all ${section} records for mass update.`, 'success');
+        } catch (err) {
+            console.error("Export error:", err);
+            showNotification("Failed to export current data. Please ensure you have permission.", "error");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const styles = {
         overlay: {
             position: 'fixed', inset: 0, zIndex: 9999,
@@ -675,16 +714,29 @@ const BulkUploadModal = ({ isOpen, onClose, section }) => {
                                     <FileText size={24} />
                                 </div>
                                 <div>
-                                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>1. Acquire Schema</h3>
+                                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>1a. Acquire Schema</h3>
                                     <p style={{ margin: '8px 0 0 0', fontSize: '0.9rem', color: '#64748b', lineHeight: 1.5 }}>
-                                        Download the master template containing accurate hierarchy headers for {section.split('-')[1] || section}.
-
+                                        Download an empty template containing accurate hierarchy headers for {section.split('-')[1] || section}.
                                     </p>
                                 </div>
                                 <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', gap: '8px', color: '#7c3aed', fontWeight: 700, fontSize: '0.9rem' }}>
                                     <Download size={18} /> Get XLSX Template
                                 </div>
                             </div>
+
+                            {(section === 'positions' || section === 'employees') && (
+                                <div className="hover-elevate" style={{ ...styles.actionCard, border: '1px solid #d1fae5' }} onClick={downloadCurrentData}>
+                                    <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <DownloadCloud size={24} />
+                                    </div>
+                                    <div>
+                                        <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>1b. Mass Update Export</h3>
+                                        <p style={{ margin: '8px 0 0 0', fontSize: '0.9rem', color: '#64748b', lineHeight: 1.5 }}>
+                                            Download <strong>all existing records with IDs</strong> to perform bulk edits on names, codes, or any other field.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
 
                             <label className="hover-elevate" style={{ ...styles.actionCard, borderStyle: 'dashed' }}>
                                 <input type="file" accept=".xlsx, .xls" style={{ display: 'none' }} onChange={handleFileChange} />

@@ -2324,24 +2324,46 @@ class PositionViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelView
                         if start_date and start_date != '-':
                             defaults['start_date'] = start_date
 
-                        # Predict Project Code Suffix Mutation for unique matching
-                        project_code = None
-                        if dept and dept.project:
-                            project_code = dept.project.code
-                        elif sec and sec.project:
-                            project_code = sec.project.code
-                        elif office:
-                            project = office.projects.first()
-                            if project: project_code = project.code
-                            
-                        search_code = code
-                        if code and project_code and project_code not in code:
-                            search_code = f"{code}-{project_code}"
-
-                        if search_code:
-                            obj, created = Position.objects.update_or_create(code=search_code, defaults=defaults)
+                        # 8. Unique Identification & Resolution
+                        # Use 'id' if provided for rock-solid mass updates (allows changing codes/names)
+                        row_id = row.get('id') or row.get('ID')
+                        
+                        if row_id and str(row_id).isdigit():
+                            obj, created = Position.objects.update_or_create(id=int(row_id), defaults=defaults)
+                            # If we updated by ID, ensure the code is also updated if provided
+                            if code:
+                                project_code = None
+                                if dept and dept.project: project_code = dept.project.code
+                                elif sec and sec.project: project_code = sec.project.code
+                                elif office:
+                                    proj = office.projects.first()
+                                    if proj: project_code = proj.code
+                                
+                                final_code = code
+                                if project_code and project_code not in code:
+                                    final_code = f"{code}-{project_code}"
+                                
+                                obj.code = final_code
+                                obj.save()
                         else:
-                            obj, created = Position.objects.update_or_create(name=name, department=dept, defaults=defaults)
+                            # Fallback to Code or Name+Dept lookup
+                            project_code = None
+                            if dept and dept.project:
+                                project_code = dept.project.code
+                            elif sec and sec.project:
+                                project_code = sec.project.code
+                            elif office:
+                                project = office.projects.first()
+                                if project: project_code = project.code
+                                
+                            search_code = code
+                            if code and project_code and project_code not in code:
+                                search_code = f"{code}-{project_code}"
+
+                            if search_code:
+                                obj, created = Position.objects.update_or_create(code=search_code, defaults=defaults)
+                            else:
+                                obj, created = Position.objects.update_or_create(name=name, department=dept, defaults=defaults)
                         
                         if created: created_count += 1
                         else: updated_count += 1
@@ -2375,6 +2397,39 @@ class PositionViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelView
             'errors': errors,
             'total_processed': len(data)
         })
+
+    @action(detail=False, methods=['get'], url_path='export-csv')
+    def export_csv(self, request):
+        import csv
+        from django.http import HttpResponse
+        
+        queryset = self.filter_queryset(self.get_queryset())
+        
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="positions_export.csv"'
+        
+        writer = csv.writer(response)
+        # Headers matching the Bulk Upload expectation
+        writer.writerow(['id', 'Position Title', 'Position Code', 'Designation Rank / Level', 'Activation Date', 'Role Name', 'Assign to Office / Unit', 'Department', 'Section / Team', 'Job Profile (Specific Role)', 'Reporting To (Codes)', 'Status'])
+        
+        for pos in queryset:
+            reporting_codes = ",".join([p.code for p in pos.reporting_to.all()])
+            writer.writerow([
+                pos.id,
+                pos.name,
+                pos.code,
+                pos.level.name if pos.level else '',
+                pos.start_date or '',
+                pos.role.name if pos.role else '',
+                pos.office.name if pos.office else '',
+                pos.department.name if pos.department else '',
+                pos.section.name if pos.section else '',
+                pos.job.name if pos.job else '',
+                reporting_codes,
+                pos.status
+            ])
+            
+        return response
 
 class EmployeeViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelViewSet):
     queryset = Employee.objects.all()
@@ -2699,10 +2754,23 @@ class EmployeeViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelView
                         print(f"DEBUG SYNC: Row {index+2} | Code: {code} | Email: '{emp_email}' | Phone: '{emp_phone}'")
 
                         # 2. Upsert Employee
-                        obj, created = Employee.objects.update_or_create(
-                            employee_code=code,
-                            defaults=defaults
-                        )
+                        row_id = row.get('id') or row.get('ID')
+                        if row_id and str(row_id).isdigit():
+                            # Update by system ID - allows changing employee_code itself
+                            obj, created = Employee.objects.update_or_create(
+                                id=int(row_id),
+                                defaults=defaults
+                            )
+                            # If code was also provided, update it explicitly
+                            if code:
+                                obj.employee_code = code
+                                obj.save()
+                        else:
+                            # Standard update by employee_code
+                            obj, created = Employee.objects.update_or_create(
+                                employee_code=code,
+                                defaults=defaults
+                            )
 
                         # 3. Position Tagging (M2M)
                         pos_codes_str = str(row.get('Position Codes') or row.get('positions') or '').strip()
@@ -2740,6 +2808,41 @@ class EmployeeViewSet(PerfectUpsertMixin, ScopedViewSetMixin, viewsets.ModelView
             'errors': errors,
             'total_processed': len(data)
         })
+
+    @action(detail=False, methods=['get'], url_path='export-csv')
+    def export_csv(self, request):
+        import csv
+        from django.http import HttpResponse
+        
+        queryset = self.filter_queryset(self.get_queryset())
+        
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="employees_export.csv"'
+        
+        writer = csv.writer(response)
+        # Headers matching the Bulk Upload expectation
+        writer.writerow(['id', 'Name *', 'Email *', 'Phone *', 'Employee Code *', 'Joining Date *', 'Date of Birth *', 'Gender *', 'Employment Type *', 'Status', 'Position Codes', 'Address', 'Father Name', 'Mother Name'])
+        
+        for emp in queryset:
+            pos_codes = ",".join([p.code for p in emp.positions.all()])
+            writer.writerow([
+                emp.id,
+                emp.name,
+                emp.email,
+                emp.phone,
+                emp.employee_code,
+                emp.hire_date or '',
+                emp.date_of_birth or '',
+                emp.gender or '',
+                emp.employment_type or 'Permanent',
+                emp.status,
+                pos_codes,
+                emp.address or '',
+                emp.father_name or '',
+                emp.mother_name or ''
+            ])
+            
+        return response
 
 
 class EmployeeTaskUrlPermissionViewSet(ScopedViewSetMixin, viewsets.ModelViewSet):

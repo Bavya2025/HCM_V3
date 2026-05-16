@@ -134,6 +134,22 @@ const api = {
             const text = await response.text();
             throw formatError(response.status, response.statusText, text);
         }
+    },
+    blob: async (endpoint, options = {}) => {
+        const { force = false, ...fetchOptions } = options;
+        let url = resolveUrl(endpoint);
+        if (force) {
+            url += (url.includes('?') ? '&' : '?') + `_t=${Date.now()}`;
+        }
+        const response = await fetch(url, {
+            headers: getHeaders(),
+            ...fetchOptions
+        });
+        if (!response.ok) {
+            const text = await response.text();
+            throw formatError(response.status, response.statusText, text);
+        }
+        return response.blob();
     }
 };
 
